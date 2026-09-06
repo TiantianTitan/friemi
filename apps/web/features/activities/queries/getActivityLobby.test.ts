@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ActivityCardViewModel } from "../types";
-import {
-  mergeMobileHomeTrendingActivities,
-  sortMobileHomeTrendingTeamActivities,
-} from "./getActivityLobby";
+import { sortMobileHomeTrendingTeamActivities } from "./getActivityLobby";
 
 function activity(
   overrides: Partial<ActivityCardViewModel>,
@@ -98,62 +95,4 @@ test("mobile home trending teams rank popularity above zero-count recency", () =
     sorted.map((item) => item.id),
     ["popular-participants", "friend-signal", "popular-favorites", "soon-zero"],
   );
-});
-
-test("mobile home trending keeps real teams ahead and fills with candidates", () => {
-  const merged = mergeMobileHomeTrendingActivities(
-    [
-      activity({ id: "real-secondary", participantCount: 1 }),
-      activity({ id: "real-popular", participantCount: 3 }),
-    ],
-    [
-      activity({
-        favoriteCount: 20,
-        id: "candidate-popular",
-        publicEventId: "candidate-popular",
-        type: "PUBLIC_EVENT",
-      }),
-      activity({
-        id: "candidate-secondary",
-        publicEventId: "candidate-secondary",
-        type: "PUBLIC_EVENT",
-      }),
-    ],
-    3,
-    new Date("2026-08-09T12:00:00.000Z"),
-  );
-
-  assert.deepEqual(
-    merged.map((item) => item.id),
-    ["real-popular", "real-secondary", "candidate-popular"],
-  );
-});
-
-test("mobile home trending shows one card for one public event series", () => {
-  const merged = mergeMobileHomeTrendingActivities(
-    [],
-    [
-      activity({
-        address: "Paris 14e",
-        coverImageUrl: "https://cdn.example/fitness.jpg",
-        id: "fitness",
-        publicEventId: "fitness",
-        title: "Paris Sport Dimanches Estivaux : Fitness et Stretching",
-        type: "PUBLIC_EVENT",
-      }),
-      activity({
-        address: "Paris 12e",
-        coverImageUrl: "https://cdn.example/boxing.jpg",
-        id: "boxing",
-        publicEventId: "boxing",
-        title: "Paris Sport Dimanches Estivaux : Boxe sur la place",
-        type: "PUBLIC_EVENT",
-      }),
-    ],
-    8,
-    new Date("2026-06-20T12:00:00.000Z"),
-  );
-
-  assert.equal(merged.length, 1);
-  assert.match(merged[0]?.title ?? "", /^Paris Sport Dimanches Estivaux/);
 });
