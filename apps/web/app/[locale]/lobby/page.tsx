@@ -16,8 +16,6 @@ import {
   createEmptyActivityLobbyFeedPage,
   getActivityLobbyInitial,
   getActivityLobbyPreview,
-  getDesktopActivityLobbyPreview,
-  getLobbySwipePublicEventActivities,
   getMobileActivityLobbyPage,
 } from "@/features/activities/queries/getActivityLobby";
 import { getOptionalLayoutViewerState } from "@/lib/auth";
@@ -146,40 +144,28 @@ export default async function ActivityLobbyPage({
   const isMobileRequest = isMobileViewportRequest(requestHeaders);
 
   if (isMobileRequest) {
-    const [mobilePage, swipeActivities] = await Promise.all([
-      perf.measure("lobby.mobileTab", () =>
-        getMobileActivityLobbyPage({
+    const mobilePage = await perf.measure("lobby.mobileTab", () =>
+      getMobileActivityLobbyPage({
+        tab: initialMobileTab,
+        viewerProfileId: profile?.id ?? null,
+      }).catch((error: unknown) => {
+        console.error("Failed to load mobile lobby tab", error);
+
+        return {
+          activities: [],
+          hasMore: false,
+          page: 1,
+          pageSize: 8,
           tab: initialMobileTab,
-          viewerProfileId: profile?.id ?? null,
-        }).catch((error: unknown) => {
-          console.error("Failed to load mobile lobby tab", error);
-
-          return {
-            activities: [],
-            hasMore: false,
-            page: 1,
-            pageSize: 8,
-            tab: initialMobileTab,
-          };
-        }),
-      ),
-      perf.measure("lobby.swipe", () =>
-        getLobbySwipePublicEventActivities(profile?.id ?? null, {
-          limit: 8,
-        }).catch((error: unknown) => {
-          console.error("Failed to load lobby swipe activities", error);
-
-          return [];
-        }),
-      ),
-    ]);
+        };
+      }),
+    );
 
     perf.finish(
       {
         hasViewer: Boolean(profile),
         initialTab: initialMobileTab,
         mobileCount: mobilePage.activities.length,
-        swipeCount: swipeActivities.length,
       },
       {
         route: `/${locale}/lobby`,
@@ -210,7 +196,6 @@ export default async function ActivityLobbyPage({
           initialHasMore={mobilePage.hasMore}
           isSignedIn={Boolean(profile)}
           locale={locale}
-          swipeActivities={swipeActivities}
           viewerProfileId={profile?.id ?? null}
         />
       </>
@@ -219,7 +204,7 @@ export default async function ActivityLobbyPage({
 
   if (!profile) {
     const previewActivities = await perf.measure("lobby.preview", () =>
-      getDesktopActivityLobbyPreview().catch((error: unknown) => {
+      getActivityLobbyPreview().catch((error: unknown) => {
         console.error("Failed to load public activity lobby preview", error);
 
         return [];
@@ -248,9 +233,7 @@ export default async function ActivityLobbyPage({
   }
 
   const lobby = await perf.measure("lobby.initialData", () =>
-    getActivityLobbyInitial(profile.id, {
-      includeDesktopCandidates: true,
-    }).catch((error: unknown) => {
+    getActivityLobbyInitial(profile.id).catch((error: unknown) => {
       console.error("Failed to load activity lobby", error);
 
       return {
@@ -296,7 +279,6 @@ export default async function ActivityLobbyPage({
         initialFilter={initialFilter}
         initialCategoryFilter={initialCategoryFilter}
         initialStatusFilter={initialStatusFilter}
-        includeDesktopCandidates
         starterActivities={lobby.starterActivities}
         locale={locale}
         viewerProfileId={profile.id}

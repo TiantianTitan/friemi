@@ -54,7 +54,6 @@ type ActivityLobbyViewProps = {
   initialFilter?: LobbyFilterId;
   initialCategoryFilter?: ActivityCategory | null;
   initialStatusFilter?: LobbyStatusFilterId;
-  includeDesktopCandidates?: boolean;
   starterActivities: ActivityCardViewModel[];
   locale: string;
   viewerProfileId: string;
@@ -1757,7 +1756,6 @@ export function ActivityLobbyView({
   initialFilter = "all",
   initialCategoryFilter = null,
   initialStatusFilter = "all",
-  includeDesktopCandidates = false,
   starterActivities,
   locale,
   viewerProfileId,
@@ -2272,9 +2270,6 @@ export function ActivityLobbyView({
           page: normalizedPage.toString(),
           status,
         });
-        if (includeDesktopCandidates) {
-          params.set("surface", "desktop");
-        }
         if (typeFilter !== "all") {
           params.set("category", typeFilter);
         }
@@ -2332,7 +2327,7 @@ export function ActivityLobbyView({
         setLoadingFeedKey((current) => (current === cacheKey ? null : current));
       }
     },
-    [includeDesktopCandidates, isDesktopViewport],
+    [isDesktopViewport],
   );
 
   const loadDeferredSection = useCallback(
@@ -3078,18 +3073,10 @@ export function ActivityLobbyView({
                   isOwnActivity={createdActivityKeys.has(
                     getLobbyActivityKey(activity),
                   )}
-                  lobbyCandidate={
-                    includeDesktopCandidates && isPublicEventCard(activity)
-                  }
                   locale={locale}
                   mobileDense
-                  mobileDetailSheet={
-                    includeDesktopCandidates && isPublicEventCard(activity)
-                  }
                   showFavoriteButton
-                  showPrimaryAction={
-                    !includeDesktopCandidates || !isPublicEventCard(activity)
-                  }
+                  showPrimaryAction
                   sourceSurface="activity_list"
                   detailSourceKey="lobby"
                   detailSourceState={{
