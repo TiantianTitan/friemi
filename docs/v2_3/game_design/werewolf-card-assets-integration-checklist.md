@@ -70,7 +70,7 @@ wolf_king_en.png
 ### 3.1 资源命名
 
 - [x] 将旧 `mafia` 目录改为 `werewolf`
-- [x] 将狼人杀主图改为 `werewolf.jpeg`
+- [x] 将狼人杀主图改为 `werewolf.png`
 - [x] 将正面角色卡统一为 `{role}_en.png`
 - [x] 保留背面数字牌 `1.png` 到 `12.png`
 - [ ] 后续新增中文正面卡 `{role}_zh-CN.png`
@@ -263,7 +263,7 @@ Checklist：
 当前保留资源：
 
 ```text
-apps/web/public/game-tools/werewolf/werewolf.jpeg
+apps/web/public/game-tools/werewolf/werewolf.png
 apps/web/public/game-tools/werewolf/recto
 apps/web/public/game-tools/werewolf/verso
 ```

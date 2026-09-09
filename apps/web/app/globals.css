@@ -171,6 +171,8 @@
   --friemi-brand-warm: var(--friemi-palette-coral);
   --app-top-safe-area: env(safe-area-inset-top);
   --app-bottom-safe-area: env(safe-area-inset-bottom);
+  --app-left-safe-area: env(safe-area-inset-left);
+  --app-right-safe-area: env(safe-area-inset-right);
   --app-mobile-header-height: calc(3.5rem + var(--app-top-safe-area));
   --app-mobile-nav-height: 3.75rem;
 }
@@ -298,6 +300,13 @@ html[data-friemi-android-app="true"] body {
 html[data-friemi-android-app="true"] {
   --app-top-safe-area: var(--friemi-android-top-inset, 0px);
   --app-bottom-safe-area: var(--friemi-android-bottom-inset, 0px);
+  --app-left-safe-area: var(--friemi-android-left-inset, 0px);
+  --app-right-safe-area: var(--friemi-android-right-inset, 0px);
+}
+
+html[data-friemi-android-app="true"] body {
+  padding-left: var(--app-left-safe-area);
+  padding-right: var(--app-right-safe-area);
 }
 
 html[data-friemi-android-app="true"] * {
@@ -428,7 +437,9 @@ html[data-friemi-ios-app="true"] .app-layout-shell > header {
 }
 
 html[data-friemi-android-app="true"] .app-layout-shell > nav {
+  left: var(--app-left-safe-area);
   padding-bottom: var(--app-bottom-safe-area);
+  right: var(--app-right-safe-area);
 }
 
 @media (max-width: 767px) {
@@ -499,6 +510,10 @@ html[data-friemi-android-app="true"] .app-layout-shell > nav {
     overflow-x: hidden;
   }
 
+  .app-layout-shell:has(.top-news-story-page) {
+    padding-bottom: 0;
+  }
+
   .app-layout-shell:has(.mobile-v23-home) > .app-header,
   .app-layout-shell:has(.mobile-v23-home) [data-mobile-scroll-progress],
   .app-layout-shell:has(.mobile-v23-home) [data-route-progress],
@@ -520,7 +535,11 @@ html[data-friemi-android-app="true"] .app-layout-shell > nav {
   .app-layout-shell:has(.mobile-v23-create) [data-route-progress],
   .app-layout-shell:has(.werewolf-room-fullscreen) > .app-header,
   .app-layout-shell:has(.werewolf-room-fullscreen) [data-mobile-scroll-progress],
-  .app-layout-shell:has(.werewolf-room-fullscreen) [data-route-progress] {
+  .app-layout-shell:has(.werewolf-room-fullscreen) [data-route-progress],
+  .app-layout-shell:has(.top-news-story-page) > .app-header,
+  .app-layout-shell:has(.top-news-story-page) > .app-mobile-nav,
+  .app-layout-shell:has(.top-news-story-page) [data-mobile-scroll-progress],
+  .app-layout-shell:has(.top-news-story-page) [data-route-progress] {
     display: none;
   }
 
@@ -558,188 +577,6 @@ html[data-friemi-android-app="true"] .app-layout-shell > nav {
 @media (min-width: 640px) {
   :root {
     --app-mobile-header-height: calc(4rem + var(--app-top-safe-area));
-  }
-}
-
-.app-orientation-lock {
-  display: none;
-}
-
-.app-orientation-lock__panel {
-  position: relative;
-  display: grid;
-  width: min(28rem, calc(100vw - 3rem));
-  justify-items: center;
-  overflow: hidden;
-  border: 1px solid rgb(var(--friemi-sage-rgb) / 0.45);
-  border-radius: 2rem;
-  background:
-    radial-gradient(
-      circle at 85% 0%,
-      rgb(var(--friemi-coral-rgb) / 0.2),
-      transparent 13rem
-    ),
-    radial-gradient(
-      circle at 15% 18%,
-      rgb(var(--friemi-meadow-rgb) / 0.16),
-      transparent 12rem
-    ),
-    linear-gradient(
-      145deg,
-      rgb(var(--friemi-paper-rgb) / 0.98),
-      rgb(var(--friemi-cream-rgb) / 0.96)
-    );
-  padding: clamp(1.15rem, 4svh, 2rem);
-  text-align: center;
-  box-shadow:
-    0 24px 70px rgb(var(--friemi-forest-rgb) / 0.22),
-    inset 0 1px 0 rgb(255 255 255 / 0.72);
-}
-
-.app-orientation-lock__panel::after {
-  position: absolute;
-  right: -1.7rem;
-  top: -1.7rem;
-  height: 8rem;
-  width: 8rem;
-  border: 1.25rem solid rgb(var(--friemi-sage-rgb) / 0.38);
-  border-radius: 2.15rem;
-  content: "";
-  transform: rotate(2deg);
-}
-
-.app-orientation-lock__device {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  height: 4.4rem;
-  width: 4.4rem;
-  place-items: center;
-  border-radius: 1.35rem;
-  background: var(--friemi-palette-forest);
-  box-shadow:
-    0 14px 30px rgb(var(--friemi-forest-rgb) / 0.22),
-    inset 0 0 0 1px rgb(255 255 255 / 0.16);
-}
-
-.app-orientation-lock__screen {
-  display: block;
-  height: 2.45rem;
-  width: 1.48rem;
-  border: 0.2rem solid var(--friemi-palette-paper);
-  border-radius: 0.42rem;
-  transform: rotate(-12deg);
-}
-
-.app-orientation-lock__arrow {
-  position: absolute;
-  right: 0.75rem;
-  top: 0.64rem;
-  height: 1.15rem;
-  width: 1.15rem;
-  border-right: 0.18rem solid var(--friemi-palette-coral);
-  border-top: 0.18rem solid var(--friemi-palette-coral);
-  transform: rotate(45deg);
-}
-
-.app-orientation-lock__arrow::before {
-  position: absolute;
-  right: -0.08rem;
-  top: -0.18rem;
-  height: 1.5rem;
-  width: 1.5rem;
-  border-top: 0.18rem solid var(--friemi-palette-coral);
-  border-radius: 999px;
-  content: "";
-  transform: rotate(-45deg) translate(-0.48rem, 0.16rem);
-}
-
-.app-orientation-lock__eyebrow {
-  position: relative;
-  z-index: 1;
-  margin: 1.05rem 0 0;
-  color: var(--friemi-palette-forest);
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-}
-
-.app-orientation-lock h2 {
-  position: relative;
-  z-index: 1;
-  margin: 0.5rem 0 0;
-  color: var(--friemi-palette-ink);
-  font-size: clamp(1.55rem, 8svh, 2.15rem);
-  line-height: 1.05;
-}
-
-.app-orientation-lock p {
-  position: relative;
-  z-index: 1;
-  margin: 0.7rem 0 0;
-  max-width: 21rem;
-  color: rgb(var(--friemi-forest-rgb) / 0.78);
-  font-size: clamp(0.95rem, 3.5svh, 1rem);
-  line-height: 1.65;
-}
-
-.app-orientation-lock__hint {
-  position: relative;
-  z-index: 1;
-  margin-top: 1rem;
-  border: 1px solid rgb(var(--friemi-sage-rgb) / 0.38);
-  border-radius: 999px;
-  background: rgb(var(--friemi-paper-rgb) / 0.82);
-  padding: 0.58rem 0.9rem;
-  color: var(--friemi-palette-forest);
-  font-size: 0.85rem;
-  font-weight: 800;
-  box-shadow: 0 10px 24px rgb(var(--friemi-forest-rgb) / 0.1);
-}
-
-@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-width: 1440px) and (max-height: 1100px),
-  (any-pointer: coarse) and (orientation: landscape) and (max-width: 1440px) and (max-height: 1100px) {
-  html,
-  body {
-    overflow: hidden;
-  }
-
-  .app-layout-shell {
-    max-height: 100svh;
-    overflow: hidden;
-    pointer-events: none;
-    user-select: none;
-  }
-
-  .app-orientation-lock {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: max(1rem, env(safe-area-inset-top))
-      max(1rem, env(safe-area-inset-right))
-      max(1rem, env(safe-area-inset-bottom))
-      max(1rem, env(safe-area-inset-left));
-    background:
-      linear-gradient(
-        rgb(var(--friemi-paper-rgb) / 0.78),
-        rgb(var(--friemi-paper-rgb) / 0.78)
-      ),
-      radial-gradient(
-        circle at 12% 0%,
-        rgb(var(--friemi-meadow-rgb) / 0.24),
-        transparent 22rem
-      ),
-      radial-gradient(
-        circle at 92% 14%,
-        rgb(var(--friemi-coral-rgb) / 0.18),
-        transparent 18rem
-      ),
-      var(--friemi-palette-fog);
-    backdrop-filter: blur(14px);
   }
 }
 
@@ -1683,8 +1520,6 @@ html[data-home-motion-ready="true"]
   [class*="[background-image:radial-gradient"],
   [style*="linear-gradient"],
   [style*="radial-gradient"],
-  .app-orientation-lock,
-  .app-orientation-lock__panel,
   .friemi-alert-card,
   .friemi-shimmer
 ) {
@@ -1714,9 +1549,6 @@ html[data-home-motion-ready="true"]
 }
 
 :where(
-  .app-orientation-lock__panel,
-  .app-orientation-lock__device,
-  .app-orientation-lock__hint,
   .friemi-shimmer,
   .co-creator-benefit-row:hover
 ) {

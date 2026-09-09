@@ -23,7 +23,10 @@ import {
 } from "@/features/activities/utils/activityCategoryVisuals";
 import { DESKTOP_LOBBY_CANDIDATE_ORIGIN } from "@/features/activities/utils/desktopLobbyCandidates";
 import { withLocale } from "@/lib/routes";
-import { getActivityCoverThumbnailUrl } from "@/lib/activity-cover-display";
+import {
+  getActivityCoverDisplayUrl,
+  getActivityCoverThumbnailUrl,
+} from "@/lib/activity-cover-display";
 import { cn } from "@/lib/utils";
 
 type MobileActivityListRowProps = {
@@ -139,10 +142,15 @@ export function MobileActivityListRow({
   const isInactiveActivity =
     displayStatus === "ENDED" || displayStatus === "CANCELLED";
   const isPrivateLocked = isPrivateActivityCardLocked(activity);
-  const coverImageUrl = getActivityCoverThumbnailUrl(
-    getActivityListCoverSrc(activity.coverImageUrl, activity.category),
-    192,
+  const coverSource = getActivityListCoverSrc(
+    activity.coverImageUrl,
+    activity.category,
   );
+  const coverImageUrl = getActivityCoverThumbnailUrl(coverSource, 192);
+  const recoveryCoverImageUrl =
+    coverImageUrl !== coverSource
+      ? getActivityCoverDisplayUrl(coverSource)
+      : null;
 
   return (
     <MobileActivityDetailSheetLink
@@ -171,6 +179,7 @@ export function MobileActivityListRow({
             "bg-gradient-to-t to-transparent",
             isInactiveActivity ? "from-zinc-900/24" : "from-black/10",
           )}
+          recoverySrc={recoveryCoverImageUrl}
           src={coverImageUrl}
         />
       </div>

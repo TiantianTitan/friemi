@@ -49,18 +49,24 @@ type CopySummary = {
     read: number;
     created: number;
     updated: number;
+    regeneratedIds: number;
   };
   activities: {
     read: number;
     created: number;
     updated: number;
     skipped: number;
+    preservedExistingOrganizers: number;
+    mappedOrganizers: number;
+    fallbackOrganizers: number;
+    regeneratedIds: number;
   };
   sourceLinks: {
     read: number;
     created: number;
     updated: number;
     skipped: number;
+    regeneratedIds: number;
   };
 };
 
@@ -154,13 +160,6 @@ async function copyMerchants(summary: CopySummary) {
 
   for (const merchant of merchants) {
     const data = toMerchantData(merchant);
-
-    if (!shouldWrite) {
-      merchantIdMap.set(merchant.id, merchant.id);
-      summary.merchants.created += 1;
-      continue;
-    }
-
     const existing = await target.merchant.findUnique({
       where: {
         slug: merchant.slug,
@@ -171,22 +170,41 @@ async function copyMerchants(summary: CopySummary) {
     });
 
     if (existing) {
-      await target.merchant.update({
-        where: {
-          id: existing.id,
-        },
-        data: {
-          ...data,
-          id: existing.id,
-        },
-      });
+      if (shouldWrite) {
+        await target.merchant.update({
+          where: {
+            id: existing.id,
+          },
+          data: {
+            ...data,
+            id: existing.id,
+          },
+        });
+      }
       merchantIdMap.set(merchant.id, existing.id);
       summary.merchants.updated += 1;
       continue;
     }
 
+    const idCollision = await target.merchant.findUnique({
+      where: { id: merchant.id },
+      select: { id: true },
+    });
+    const createData = { ...data };
+
+    if (idCollision) {
+      delete createData.id;
+      summary.merchants.regeneratedIds += 1;
+    }
+
+    if (!shouldWrite) {
+      merchantIdMap.set(merchant.id, merchant.id);
+      summary.merchants.created += 1;
+      continue;
+    }
+
     const created = await target.merchant.create({
-      data,
+      data: createData,
       select: {
         id: true,
       },
@@ -196,6 +214,34 @@ async function copyMerchants(summary: CopySummary) {
   }
 
   return merchantIdMap;
+}
+
+async function buildTargetOrganizerIdMap(activities: ActivityRecord[]) {
+  const sourceOrganizerIds = Array.from(
+    new Set(activities.map((activity) => activity.organizerId)),
+  );
+  const sourceOrganizers = await source.userProfile.findMany({
+    where: { id: { in: sourceOrganizerIds } },
+    select: { id: true, clerkUserId: true },
+  });
+  const targetOrganizers = await target.userProfile.findMany({
+    where: {
+      clerkUserId: {
+        in: sourceOrganizers.map((profile) => profile.clerkUserId),
+      },
+    },
+    select: { id: true, clerkUserId: true },
+  });
+  const targetIdByClerkId = new Map(
+    targetOrganizers.map((profile) => [profile.clerkUserId, profile.id]),
+  );
+
+  return new Map(
+    sourceOrganizers.flatMap((profile) => {
+      const mappedId = targetIdByClerkId.get(profile.clerkUserId);
+      return mappedId ? [[profile.id, mappedId] as const] : [];
+    }),
+  );
 }
 
 function buildActivityDedupeWhere(
@@ -300,6 +346,8 @@ async function copyActivities(
   const activityIdMap = new Map<string, string>();
 
   summary.activities.read = activities.length;
+  const targetOrganizerIdBySourceId =
+    await buildTargetOrganizerIdMap(activities);
 
   for (const activity of activities) {
     const merchantId = activity.merchantId
@@ -311,7 +359,75 @@ async function copyActivities(
       continue;
     }
 
-    const data = toActivityData(activity, organizerId, merchantId ?? null);
+    const existing = await target.activity.findFirst({
+      where: {
+        OR: buildActivityDedupeWhere(activity),
+      },
+      select: {
+        id: true,
+        organizerId: true,
+        visibility: true,
+        coverImageUrl: true,
+      },
+    });
+
+    if (existing && existing.visibility !== "PUBLIC") {
+      summary.activities.skipped += 1;
+      continue;
+    }
+
+    if (existing) {
+      const data = toActivityData(
+        activity,
+        existing.organizerId,
+        merchantId ?? null,
+      );
+
+      if (existing.coverImageUrl) {
+        data.coverImageUrl = existing.coverImageUrl;
+      }
+
+      if (shouldWrite) {
+        await target.activity.update({
+          where: {
+            id: existing.id,
+          },
+          data: {
+            ...data,
+            id: existing.id,
+          },
+        });
+      }
+      activityIdMap.set(activity.id, existing.id);
+      summary.activities.updated += 1;
+      summary.activities.preservedExistingOrganizers += 1;
+      continue;
+    }
+
+    const mappedOrganizerId = targetOrganizerIdBySourceId.get(
+      activity.organizerId,
+    );
+    const data = toActivityData(
+      activity,
+      mappedOrganizerId ?? organizerId,
+      merchantId ?? null,
+    );
+    const idCollision = await target.activity.findUnique({
+      where: { id: activity.id },
+      select: { id: true },
+    });
+    const createData = { ...data };
+
+    if (mappedOrganizerId) {
+      summary.activities.mappedOrganizers += 1;
+    } else {
+      summary.activities.fallbackOrganizers += 1;
+    }
+
+    if (idCollision) {
+      delete createData.id;
+      summary.activities.regeneratedIds += 1;
+    }
 
     if (!shouldWrite) {
       activityIdMap.set(activity.id, activity.id);
@@ -319,32 +435,8 @@ async function copyActivities(
       continue;
     }
 
-    const existing = await target.activity.findFirst({
-      where: {
-        OR: buildActivityDedupeWhere(activity),
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (existing) {
-      await target.activity.update({
-        where: {
-          id: existing.id,
-        },
-        data: {
-          ...data,
-          id: existing.id,
-        },
-      });
-      activityIdMap.set(activity.id, existing.id);
-      summary.activities.updated += 1;
-      continue;
-    }
-
     const created = await target.activity.create({
-      data,
+      data: createData,
       select: {
         id: true,
       },
@@ -388,12 +480,6 @@ async function copySourceLinks(
     }
 
     const data = toSourceLinkData(sourceLink, activityId);
-
-    if (!shouldWrite) {
-      summary.sourceLinks.created += 1;
-      continue;
-    }
-
     const existing = await target.activitySourceLink.findUnique({
       where: {
         sourceUrl: sourceLink.sourceUrl,
@@ -404,21 +490,39 @@ async function copySourceLinks(
     });
 
     if (existing) {
-      await target.activitySourceLink.update({
-        where: {
-          id: existing.id,
-        },
-        data: {
-          ...data,
-          id: existing.id,
-        },
-      });
+      if (shouldWrite) {
+        await target.activitySourceLink.update({
+          where: {
+            id: existing.id,
+          },
+          data: {
+            ...data,
+            id: existing.id,
+          },
+        });
+      }
       summary.sourceLinks.updated += 1;
       continue;
     }
 
+    const idCollision = await target.activitySourceLink.findUnique({
+      where: { id: sourceLink.id },
+      select: { id: true },
+    });
+    const createData = { ...data };
+
+    if (idCollision) {
+      delete createData.id;
+      summary.sourceLinks.regeneratedIds += 1;
+    }
+
+    if (!shouldWrite) {
+      summary.sourceLinks.created += 1;
+      continue;
+    }
+
     await target.activitySourceLink.create({
-      data,
+      data: createData,
     });
     summary.sourceLinks.created += 1;
   }
@@ -431,18 +535,24 @@ async function main() {
       read: 0,
       created: 0,
       updated: 0,
+      regeneratedIds: 0,
     },
     activities: {
       read: 0,
       created: 0,
       updated: 0,
       skipped: 0,
+      preservedExistingOrganizers: 0,
+      mappedOrganizers: 0,
+      fallbackOrganizers: 0,
+      regeneratedIds: 0,
     },
     sourceLinks: {
       read: 0,
       created: 0,
       updated: 0,
       skipped: 0,
+      regeneratedIds: 0,
     },
   };
   const organizer = await getTargetOrganizer();

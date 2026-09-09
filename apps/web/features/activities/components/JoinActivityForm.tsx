@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, UserPlus } from "lucide-react";
 import { Button, Input, Textarea } from "@chill-club/ui";
 import { trackClientAnalyticsEvent } from "@/features/analytics/client";
 import {
@@ -33,7 +34,7 @@ type JoinActivityFormProps = {
   activityId: string;
   activityTitle: string;
   accessToken?: string | null;
-  compactUnauthenticated?: boolean;
+  canAddGuest?: boolean;
   closeOnSuccess?: boolean;
   formInstanceId?: string;
   hideMessageHint?: boolean;
@@ -52,9 +53,11 @@ const initialGuestState: GuestJoinActivityState = {};
 function getGuestJoinCopy(locale: string) {
   if (locale === "fr") {
     return {
-      title: "Inscription invité",
+      addAnother: "Ajouter un autre invité",
+      adminEntry: "Ajouter un invité",
+      title: "Ajouter un invité",
       description:
-        "Laissez seulement un nom pour vous inscrire. Téléphone, e-mail et WeChat restent optionnels; e-mail ou WeChat aideront à retrouver cette inscription plus tard.",
+        "Réservé aux administrateurs Friemi. L'invité est ajouté directement à la liste des participants.",
       displayNameLabel: "Nom ou pseudo",
       displayNamePlaceholder: "Votre nom affiché",
       phoneLabel: "Téléphone",
@@ -64,31 +67,26 @@ function getGuestJoinCopy(locale: string) {
       wechatLabel: "WeChat",
       wechatPlaceholder: "Identifiant WeChat, optionnel",
       contactHint:
-        "Les contacts sont optionnels. E-mail ou WeChat facilitent le rattachement a votre compte plus tard.",
+        "Les coordonnées sont facultatives et peuvent servir à rattacher cette participation à un compte plus tard.",
       messageLabel: "Message",
-      submitApproval: "Envoyer une demande",
-      submit: "S'inscrire",
+      submit: "Ajouter l'invité",
       submitting: "Envoi...",
-      loginJoinApproval: "Se connecter pour demander",
-      loginJoin: "S'inscrire avec un compte",
-      guestJoinApproval: "Demande invité",
-      guestJoin: "Continuer en invité",
-      appLoginHint:
-        "Dans l'app Friemi, l'inscription passe par un compte pour garder vos sorties, notifications et messages au même endroit.",
-      signIn: "Se connecter",
-      successTitle: "Inscription reçue",
+      loginJoin: "Se connecter pour s'inscrire",
+      loginRequired:
+        "La consultation reste libre, mais un compte est obligatoire pour s'inscrire et assurer le suivi des participations.",
+      successTitle: "Invité ajouté",
       successDescription:
-        "Votre inscription est enregistrée. En créant un compte avec le même e-mail ou WeChat, elle sera rattachée automatiquement.",
-      successDescriptionApproval:
-        "Votre demande est envoyée. Elle sera visible par l'organisateur et comptera une fois validée.",
+        "L'invité figure maintenant dans la liste des participants.",
     };
   }
 
   if (locale === "en") {
     return {
-      title: "Guest signup",
+      addAnother: "Add another guest",
+      adminEntry: "Add guest",
+      title: "Add guest",
       description:
-        "Leave just a name to join. Phone, email, and WeChat are optional; email or WeChat can link this signup to your account later.",
+        "Friemi admins only. The guest is added directly to the participant list.",
       displayNameLabel: "Name or nickname",
       displayNamePlaceholder: "Name shown to the organizer",
       phoneLabel: "Phone",
@@ -98,30 +96,23 @@ function getGuestJoinCopy(locale: string) {
       wechatLabel: "WeChat",
       wechatPlaceholder: "WeChat ID, optional",
       contactHint:
-        "Contact fields are optional. Email or WeChat makes it easier to recover this signup later.",
+        "Contact details are optional and can link this participation to an account later.",
       messageLabel: "Message",
-      submitApproval: "Send request",
-      submit: "Join as guest",
+      submit: "Add guest",
       submitting: "Submitting...",
-      loginJoinApproval: "Sign in to request",
       loginJoin: "Sign in to join",
-      guestJoinApproval: "Guest request",
-      guestJoin: "Guest signup",
-      appLoginHint:
-        "In the Friemi app, joining uses your account so your plans, messages, and notifications stay together.",
-      signIn: "Sign in instead",
-      successTitle: "Signup received",
-      successDescription:
-        "Your signup is saved. If you create an account with the same email or WeChat, it will link automatically.",
-      successDescriptionApproval:
-        "Your request is submitted. The organizer can review it, and it will count once approved.",
+      loginRequired:
+        "Anyone can browse, but joining requires an account so attendance and no-shows can be tracked.",
+      successTitle: "Guest added",
+      successDescription: "The guest is now included in the participant list.",
     };
   }
 
   return {
-    title: "游客报名",
-    description:
-      "只填写名字/昵称也可以报名。电话、邮箱、微信都可选；填写邮箱或微信后，之后注册/绑定账号时更容易找回这条报名记录。",
+    addAnother: "继续添加游客",
+    adminEntry: "添加游客",
+    title: "管理员添加游客",
+    description: "仅网站管理员可操作。游客会直接加入报名名单。",
     displayNameLabel: "名字/昵称",
     displayNamePlaceholder: "活动中展示的名字",
     phoneLabel: "电话",
@@ -130,34 +121,16 @@ function getGuestJoinCopy(locale: string) {
     emailPlaceholder: "邮箱，可选",
     wechatLabel: "微信",
     wechatPlaceholder: "微信号，可选",
-    contactHint: "联系方式可选；填写邮箱或微信后，更方便之后找回报名。",
+    contactHint: "联系方式可选，之后可用于将这条参与记录关联到账号。",
     messageLabel: "报名留言",
-    submitApproval: "提交游客申请",
-    submit: "游客报名",
+    submit: "添加游客",
     submitting: "提交中...",
-    loginJoinApproval: "登录申请加入",
-    loginJoin: "登录报名",
-    guestJoinApproval: "游客申请加入",
-    guestJoin: "游客报名",
-    appLoginHint:
-      "Friemi App 内报名需要登录账号，方便保留组局、消息和通知记录。",
-    signIn: "已有账号，去登录",
-    successTitle: "报名已提交",
-    successDescription:
-      "报名记录已保存。以后使用相同邮箱或微信绑定账号，会自动关联到你的账号。",
-    successDescriptionApproval:
-      "申请已提交给发起人，通过后会计入报名人数。以后使用相同邮箱或微信绑定账号，也会自动关联。",
+    loginJoin: "登录后报名",
+    loginRequired:
+      "游客可以浏览聚吧内容，但报名必须登录，以便记录参与和爽约情况。",
+    successTitle: "游客已添加",
+    successDescription: "该游客已进入报名名单。",
   };
-}
-
-function useIsAndroidApp() {
-  const [isAndroidApp, setIsAndroidApp] = useState(false);
-
-  useEffect(() => {
-    setIsAndroidApp(/FriemiAndroid\//i.test(window.navigator.userAgent));
-  }, []);
-
-  return isAndroidApp;
 }
 
 function SubmitButton({
@@ -191,13 +164,7 @@ function SubmitButton({
   );
 }
 
-function GuestSubmitButton({
-  locale,
-  requiresApproval,
-}: {
-  locale: string;
-  requiresApproval: boolean;
-}) {
+function GuestSubmitButton({ locale }: { locale: string }) {
   const { pending } = useFormStatus();
   const t = getGuestJoinCopy(locale);
 
@@ -212,11 +179,7 @@ function GuestSubmitButton({
         <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
       ) : null}
       <span className="min-w-0 text-center leading-tight">
-        {pending
-          ? t.submitting
-          : requiresApproval
-            ? t.submitApproval
-            : t.submit}
+        {pending ? t.submitting : t.submit}
       </span>
     </Button>
   );
@@ -258,17 +221,13 @@ function DisabledAction({
 
 function GuestJoinForm({
   activityId,
-  accessToken,
   formAction,
   locale,
-  requiresApproval,
   state,
 }: {
   activityId: string;
-  accessToken?: string | null;
   formAction: (payload: FormData) => void;
   locale: string;
-  requiresApproval: boolean;
   state: GuestJoinActivityState;
 }) {
   const t = getGuestJoinCopy(locale);
@@ -285,17 +244,14 @@ function GuestJoinForm({
           entityType: "team",
           sourceSurface: "activity_detail",
           properties: {
-            requires_approval: requiresApproval,
-            signup_mode: "guest",
+            requires_approval: false,
+            signup_mode: "admin_guest",
           },
         });
       }}
     >
       <input name="activityId" type="hidden" value={activityId} />
       <input name="locale" type="hidden" value={locale} />
-      {accessToken ? (
-        <input name="accessToken" type="hidden" value={accessToken} />
-      ) : null}
 
       <div className="rounded-md border border-sand bg-white/70 px-3 py-2.5 text-sm">
         <p className="font-semibold text-ink">{t.title}</p>
@@ -402,13 +358,7 @@ function GuestJoinForm({
       </label>
 
       <PendingSubmitNotice locale={locale} />
-      <GuestSubmitButton locale={locale} requiresApproval={requiresApproval} />
-      <Link
-        className="text-center text-xs font-medium text-zinc-500 underline-offset-4 hover:text-ink hover:underline"
-        href={getSignInHref(locale, getActivityDetailPath(activityId))}
-      >
-        {t.signIn}
-      </Link>
+      <GuestSubmitButton locale={locale} />
     </form>
   );
 }
@@ -490,78 +440,130 @@ function RejoinNotice({
   );
 }
 
-function GuestJoinEntry({
+function getSignInReturnPath(activityId: string, accessToken?: string | null) {
+  const detailPath = getActivityDetailPath(activityId);
+
+  if (!accessToken) {
+    return detailPath;
+  }
+
+  const params = new URLSearchParams({ access: accessToken });
+  return `${detailPath}?${params.toString()}`;
+}
+
+function SignInToJoinEntry({
   accessToken,
   activityId,
-  formInstanceId,
-  formAction,
   locale,
-  requiresApproval,
-  state,
 }: {
-  activityId: string;
   accessToken?: string | null;
-  formInstanceId?: string;
-  formAction: (payload: FormData) => void;
+  activityId: string;
   locale: string;
-  requiresApproval: boolean;
-  state: GuestJoinActivityState;
 }) {
   const t = getGuestJoinCopy(locale);
-  const loginJoinLabel = requiresApproval ? t.loginJoinApproval : t.loginJoin;
-  const guestJoinLabel = requiresApproval ? t.guestJoinApproval : t.guestJoin;
-  const [showGuestForm, setShowGuestForm] = useState(false);
-  const isAndroidApp = useIsAndroidApp();
-  const guestFormId = `guest-join-form-${activityId}${formInstanceId ? `-${formInstanceId}` : ""}`;
 
-  if (isAndroidApp) {
+  return (
+    <div className="grid gap-2.5">
+      <Link
+        className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-full border border-transparent bg-coral px-3 py-2 text-center text-sm font-semibold leading-tight text-white shadow-[0_12px_24px_rgba(240,145,130,0.22)] transition hover:bg-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/35"
+        href={getSignInHref(
+          locale,
+          getSignInReturnPath(activityId, accessToken),
+        )}
+      >
+        <span className="min-w-0 leading-tight">{t.loginJoin}</span>
+      </Link>
+      <p className="px-1 text-xs font-medium leading-5 text-[#156240]/75">
+        {t.loginRequired}
+      </p>
+    </div>
+  );
+}
+
+function AdminGuestParticipantControlInstance({
+  activityId,
+  closeOnSuccess,
+  formInstanceId,
+  locale,
+  onReset,
+}: {
+  activityId: string;
+  closeOnSuccess: boolean;
+  formInstanceId?: string;
+  locale: string;
+  onReset: () => void;
+}) {
+  const [state, formAction] = useActionState(
+    joinActivityAsGuestAction,
+    initialGuestState,
+  );
+  const [showGuestForm, setShowGuestForm] = useState(false);
+  const [, startTransition] = useTransition();
+  const router = useRouter();
+  const closeMobileCtaSheet = useTeamDetailMobileCtaSheetClose();
+  const t = getGuestJoinCopy(locale);
+  const guestFormId = `admin-guest-form-${activityId}${formInstanceId ? `-${formInstanceId}` : ""}`;
+
+  useEffect(() => {
+    if (!state.success) {
+      return;
+    }
+
+    startTransition(() => {
+      router.refresh();
+    });
+
+    if (closeOnSuccess) {
+      closeMobileCtaSheet?.();
+    }
+  }, [
+    closeMobileCtaSheet,
+    closeOnSuccess,
+    router,
+    startTransition,
+    state.success,
+  ]);
+
+  if (state.success) {
     return (
-      <div className="grid gap-2.5">
-        <Link
-          className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-full border border-transparent bg-coral px-3 py-2 text-center text-sm font-semibold leading-tight text-white shadow-[0_12px_24px_rgba(240,145,130,0.22)] transition hover:bg-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/35"
-          href={getSignInHref(locale, getActivityDetailPath(activityId))}
+      <div className="grid gap-2.5 rounded-lg border border-[#8AB68E] bg-[#F6FAF4] p-3 text-sm">
+        <div>
+          <p className="font-semibold text-[#156240]">{t.successTitle}</p>
+          <p className="mt-1 leading-5 text-[#156240]/70">
+            {t.successDescription}
+          </p>
+        </div>
+        <button
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-[#8AB68E] bg-white px-4 font-semibold text-[#156240]"
+          onClick={onReset}
+          type="button"
         >
-          <span className="min-w-0 leading-tight">{loginJoinLabel}</span>
-        </Link>
-        <p className="rounded-2xl border border-[#D6D5B2]/75 bg-[#FEFFF9] px-3 py-2 text-xs font-medium leading-5 text-[#156240]/75">
-          {t.appLoginHint}
-        </p>
+          <UserPlus aria-hidden="true" className="h-4 w-4" />
+          {t.addAnother}
+        </button>
       </div>
     );
   }
 
   return (
     <div className="grid gap-3">
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Link
-          className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-full border border-transparent bg-coral px-3 py-2 text-center text-sm font-semibold leading-tight text-white shadow-[0_12px_24px_rgba(240,145,130,0.22)] transition hover:bg-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/35"
-          href={getSignInHref(locale, getActivityDetailPath(activityId))}
-        >
-          <span className="min-w-0 leading-tight">{loginJoinLabel}</span>
-        </Link>
-        <button
-          type="button"
-          aria-controls={guestFormId}
-          aria-expanded={showGuestForm}
-          className={
-            showGuestForm
-              ? "inline-flex min-h-11 min-w-0 items-center justify-center rounded-full border border-[#8AB68E] bg-white px-3 py-2 text-center text-sm font-semibold leading-tight text-[#156240] transition hover:bg-[#FEFFF9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#369758]/25"
-              : "inline-flex min-h-11 min-w-0 items-center justify-center rounded-full border border-sand bg-white px-3 py-2 text-center text-sm font-semibold leading-tight text-zinc-600 transition hover:border-[#8AB68E] hover:bg-[#FEFFF9] hover:text-[#156240] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#369758]/20"
-          }
-          onClick={() => setShowGuestForm(true)}
-        >
-          <span className="min-w-0 leading-tight">{guestJoinLabel}</span>
-        </button>
-      </div>
+      <button
+        aria-controls={guestFormId}
+        aria-expanded={showGuestForm}
+        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[#8AB68E] bg-white px-4 text-sm font-semibold text-[#156240] transition hover:bg-[#F6FAF4] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#369758]/25"
+        onClick={() => setShowGuestForm((current) => !current)}
+        type="button"
+      >
+        <UserPlus aria-hidden="true" className="h-4 w-4" />
+        {t.adminEntry}
+      </button>
 
       {showGuestForm ? (
         <div id={guestFormId}>
           <GuestJoinForm
-            accessToken={accessToken}
             activityId={activityId}
             formAction={formAction}
             locale={locale}
-            requiresApproval={requiresApproval}
             state={state}
           />
         </div>
@@ -570,10 +572,36 @@ function GuestJoinEntry({
   );
 }
 
+export function AdminGuestParticipantControl({
+  activityId,
+  closeOnSuccess = false,
+  formInstanceId,
+  locale,
+}: {
+  activityId: string;
+  closeOnSuccess?: boolean;
+  formInstanceId?: string;
+  locale: string;
+}) {
+  const [formVersion, setFormVersion] = useState(0);
+
+  return (
+    <AdminGuestParticipantControlInstance
+      activityId={activityId}
+      closeOnSuccess={closeOnSuccess}
+      formInstanceId={formInstanceId}
+      key={formVersion}
+      locale={locale}
+      onReset={() => setFormVersion((current) => current + 1)}
+    />
+  );
+}
+
 export function JoinActivityForm({
   activityId,
   activityTitle,
   accessToken = null,
+  canAddGuest = false,
   closeOnSuccess = false,
   formInstanceId,
   hideMessageHint = false,
@@ -586,13 +614,8 @@ export function JoinActivityForm({
   viewerParticipationStatus,
 }: JoinActivityFormProps) {
   const [state, formAction] = useActionState(joinActivityAction, initialState);
-  const [guestState, guestFormAction] = useActionState(
-    joinActivityAsGuestAction,
-    initialGuestState,
-  );
   const [effectiveParticipationStatus, setEffectiveParticipationStatus] =
     useState<ViewerParticipationStatus>(viewerParticipationStatus);
-  const [joinedAsGuest, setJoinedAsGuest] = useState(false);
   const [, startTransition] = useTransition();
   const router = useRouter();
   const t = getCopy(locale).join;
@@ -600,7 +623,6 @@ export function JoinActivityForm({
 
   useEffect(() => {
     setEffectiveParticipationStatus(viewerParticipationStatus);
-    setJoinedAsGuest(false);
   }, [viewerParticipationStatus]);
 
   useEffect(() => {
@@ -629,38 +651,13 @@ export function JoinActivityForm({
     state.success,
   ]);
 
-  useEffect(() => {
-    if (!guestState.success || !guestState.guestStatus) {
-      return;
-    }
-
-    if (closeOnSuccess) {
-      closeMobileCtaSheet?.();
-      startTransition(() => {
-        router.refresh();
-      });
-      return;
-    }
-
-    setJoinedAsGuest(true);
-    setEffectiveParticipationStatus(guestState.guestStatus);
-    startTransition(() => {
-      router.refresh();
-    });
-  }, [
-    closeMobileCtaSheet,
-    closeOnSuccess,
-    guestState.guestStatus,
-    guestState.success,
-    router,
-    startTransition,
-  ]);
-
   if (isClosed) {
     return (
       <DisabledAction title={t.closedTitle} description={t.closedDescription} />
     );
   }
+
+  let participationContent: ReactNode;
 
   if (
     effectiveParticipationStatus &&
@@ -669,116 +666,112 @@ export function JoinActivityForm({
   ) {
     const copy = getParticipationCopy(effectiveParticipationStatus, locale);
 
-    return (
+    participationContent = (
       <div className="grid gap-2.5">
         <ParticipationStatusCard
           description={copy.description}
           isPending={effectiveParticipationStatus === "PENDING"}
           title={copy.title}
         />
-        {joinedAsGuest ? (
-          <p className="px-1 text-xs leading-5 text-zinc-500">
-            {effectiveParticipationStatus === "PENDING"
-              ? getGuestJoinCopy(locale).successDescriptionApproval
-              : getGuestJoinCopy(locale).successDescription}
-          </p>
-        ) : (
-          <CancelParticipationForm
-            activityId={activityId}
-            activityTitle={activityTitle}
-            locale={locale}
-            onCancelled={() => setEffectiveParticipationStatus(null)}
-          />
-        )}
+        <CancelParticipationForm
+          activityId={activityId}
+          activityTitle={activityTitle}
+          locale={locale}
+          onCancelled={() => setEffectiveParticipationStatus(null)}
+        />
       </div>
     );
-  }
-
-  if (isFull) {
+  } else if (isFull) {
     return (
       <DisabledAction title={t.fullTitle} description={t.fullDescription} />
     );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <GuestJoinEntry
+  } else if (!isAuthenticated) {
+    participationContent = (
+      <SignInToJoinEntry
         accessToken={accessToken}
         activityId={activityId}
-        formInstanceId={formInstanceId}
-        formAction={guestFormAction}
         locale={locale}
-        requiresApproval={requiresApproval}
-        state={guestState}
       />
     );
-  }
-
-  if (isOrganizer) {
-    return (
+  } else if (isOrganizer) {
+    participationContent = (
       <DisabledAction
         title={t.organizerTitle}
         description={t.organizerDescription}
       />
     );
+  } else {
+    participationContent = (
+      <form
+        action={formAction}
+        className="grid gap-3"
+        noValidate
+        onSubmit={() => {
+          trackClientAnalyticsEvent({
+            name: "join_started",
+            entityId: activityId,
+            entityType: "team",
+            sourceSurface: "activity_detail",
+            properties: {
+              requires_approval: requiresApproval,
+            },
+          });
+        }}
+      >
+        <input name="activityId" type="hidden" value={activityId} />
+        <input name="locale" type="hidden" value={locale} />
+        {accessToken ? (
+          <input name="accessToken" type="hidden" value={accessToken} />
+        ) : null}
+
+        {effectiveParticipationStatus === "REJECTED" ? (
+          <RejoinNotice locale={locale} status={effectiveParticipationStatus} />
+        ) : null}
+
+        {state.formError ? (
+          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {state.formError}
+          </div>
+        ) : null}
+
+        <label className="grid gap-2 text-sm font-medium text-zinc-700">
+          {t.messageLabel}
+          <Textarea
+            className="min-h-24"
+            name="message"
+            defaultValue={state.values?.message}
+            maxLength={300}
+            placeholder={t.messagePlaceholder}
+          />
+          {hideMessageHint ? null : (
+            <span className="text-xs font-normal text-zinc-500">
+              {requiresApproval ? t.messageHintApproval : t.messageHint}
+            </span>
+          )}
+          {state.fieldErrors?.message?.[0] ? (
+            <span className="text-xs font-medium text-red-600">
+              {state.fieldErrors.message[0]}
+            </span>
+          ) : null}
+        </label>
+
+        <PendingSubmitNotice locale={locale} />
+        <SubmitButton locale={locale} requiresApproval={requiresApproval} />
+      </form>
+    );
   }
 
   return (
-    <form
-      action={formAction}
-      className="grid gap-3"
-      noValidate
-      onSubmit={() => {
-        trackClientAnalyticsEvent({
-          name: "join_started",
-          entityId: activityId,
-          entityType: "team",
-          sourceSurface: "activity_detail",
-          properties: {
-            requires_approval: requiresApproval,
-          },
-        });
-      }}
-    >
-      <input name="activityId" type="hidden" value={activityId} />
-      <input name="locale" type="hidden" value={locale} />
-      {accessToken ? (
-        <input name="accessToken" type="hidden" value={accessToken} />
-      ) : null}
-
-      {effectiveParticipationStatus === "REJECTED" ? (
-        <RejoinNotice locale={locale} status={effectiveParticipationStatus} />
-      ) : null}
-
-      {state.formError ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {state.formError}
-        </div>
-      ) : null}
-
-      <label className="grid gap-2 text-sm font-medium text-zinc-700">
-        {t.messageLabel}
-        <Textarea
-          className="min-h-24"
-          name="message"
-          defaultValue={state.values?.message}
-          maxLength={300}
-          placeholder={t.messagePlaceholder}
+    <div className="grid gap-3">
+      {participationContent}
+      {canAddGuest && isAuthenticated && !isFull ? (
+        <AdminGuestParticipantControl
+          activityId={activityId}
+          closeOnSuccess={closeOnSuccess}
+          formInstanceId={formInstanceId}
+          locale={locale}
         />
-        {hideMessageHint ? null : (
-          <span className="text-xs font-normal text-zinc-500">
-            {requiresApproval ? t.messageHintApproval : t.messageHint}
-          </span>
-        )}
-        {state.fieldErrors?.message?.[0] ? (
-          <span className="text-xs font-medium text-red-600">
-            {state.fieldErrors.message[0]}
-          </span>
-        ) : null}
-      </label>
-
-      <PendingSubmitNotice locale={locale} />
-      <SubmitButton locale={locale} requiresApproval={requiresApproval} />
-    </form>
+      ) : null}
+    </div>
   );
 }

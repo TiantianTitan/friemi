@@ -57,6 +57,10 @@ test("auth links carry the normalized target through sign-in and sign-up", () =>
     getSignUpHref("en", "/lobby?status=open"),
     "/en/sign-up?redirect_url=%2Fen%2Flobby%3Fstatus%3Dopen",
   );
+  assert.equal(
+    getSignInHref("zh-CN", "/lobby/private_1?access=invite_token"),
+    "/zh-CN/sign-in?redirect_url=%2Fzh-CN%2Flobby%2Fprivate_1%3Faccess%3Dinvite_token",
+  );
 });
 
 test("profile setup links preserve a safe post-registration target", () => {

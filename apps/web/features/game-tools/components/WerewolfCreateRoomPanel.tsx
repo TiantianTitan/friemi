@@ -319,7 +319,7 @@ function WerewolfVariantModeCard({
   const heroRole = getVariantHeroRole(variant);
   const heroImage =
     getWerewolfRoleCardImage(heroRole, locale) ??
-    "/game-tools/werewolf/werewolf.jpeg";
+    "/game-tools/werewolf/werewolf.png";
   const title = getWerewolfVariantLabel(locale, variant);
   const coreRoles = getVariantCoreRoleLabels(locale, variant);
 

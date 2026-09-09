@@ -1,4 +1,7 @@
-import { isHotlinkProtectedCoverUrl } from "./activity-cover-shared";
+import {
+  isHotlinkProtectedCoverUrl,
+  isSupabaseActivityCoverUrl,
+} from "./activity-cover-shared";
 
 const defaultThumbnailQuality = 75;
 
@@ -24,37 +27,16 @@ export function getActivityCoverThumbnailUrl(
     return normalizedUrl;
   }
 
-  let parsedUrl: URL;
-
-  try {
-    parsedUrl = new URL(normalizedUrl);
-  } catch {
-    return normalizedUrl;
-  }
-
-  if (
-    parsedUrl.protocol !== "https:" ||
-    !parsedUrl.hostname.endsWith(".supabase.co")
-  ) {
+  if (!isSupabaseActivityCoverUrl(normalizedUrl)) {
     return getActivityCoverDisplayUrl(normalizedUrl);
   }
 
-  const objectPrefix = "/storage/v1/object/public/";
-  const renderPrefix = "/storage/v1/render/image/public/";
-
-  if (parsedUrl.pathname.startsWith(objectPrefix)) {
-    parsedUrl.pathname = `${renderPrefix}${parsedUrl.pathname.slice(
-      objectPrefix.length,
-    )}`;
-  } else if (!parsedUrl.pathname.startsWith(renderPrefix)) {
-    return normalizedUrl;
-  }
-
   const normalizedSize = Math.min(640, Math.max(64, Math.round(size)));
-  parsedUrl.searchParams.set("width", String(normalizedSize));
-  parsedUrl.searchParams.set("height", String(normalizedSize));
-  parsedUrl.searchParams.set("resize", "cover");
-  parsedUrl.searchParams.set("quality", String(defaultThumbnailQuality));
+  const searchParams = new URLSearchParams({
+    quality: String(defaultThumbnailQuality),
+    size: String(normalizedSize),
+    url: normalizedUrl,
+  });
 
-  return parsedUrl.toString();
+  return `/api/activity-cover-thumbnail?${searchParams.toString()}`;
 }

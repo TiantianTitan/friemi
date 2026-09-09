@@ -215,7 +215,7 @@ function getWerewolfRoomPreloadAssets({
   return Array.from(
     new Set([
       atmosphereSrc,
-      "/game-tools/werewolf/werewolf.jpeg",
+      "/game-tools/werewolf/werewolf.png",
       ...Array.from({ length: 12 }, (_, index) =>
         getWerewolfSeatBackImage(index + 1),
       ),
@@ -2140,7 +2140,7 @@ export function WerewolfRoomOverview({
                     aria-hidden="true"
                     className="h-full w-full object-cover opacity-75"
                     draggable={false}
-                    src="/game-tools/werewolf/werewolf.jpeg"
+                    src="/game-tools/werewolf/werewolf.png"
                   />
                 </span>
                 <div className="min-w-0 flex-1">

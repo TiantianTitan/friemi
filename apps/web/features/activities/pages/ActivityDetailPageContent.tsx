@@ -51,7 +51,10 @@ import { ActivityShareTools } from "@/features/activities/components/ActivitySha
 import { getActivityPriorityAdminSnapshot } from "@/features/activities/priority/adminActivityPriority";
 import { CancelParticipationForm } from "@/features/activities/components/CancelParticipationForm";
 import { CancelActivityForm } from "@/features/activities/components/CancelActivityForm";
-import { JoinActivityForm } from "@/features/activities/components/JoinActivityForm";
+import {
+  AdminGuestParticipantControl,
+  JoinActivityForm,
+} from "@/features/activities/components/JoinActivityForm";
 import { ParticipationApprovalPanel } from "@/features/activities/components/ParticipationApprovalPanel";
 import { BoardGameToolFloatingEntry } from "@/features/activities/components/BoardGameToolFloatingEntry";
 import { TeamDetailMobileCtaSheet } from "@/features/activities/components/TeamDetailMobileCtaSheet";
@@ -977,12 +980,34 @@ export async function ActivityDetailPageContent({
 
   const weatherInput = getActivityWeatherWidgetInput(activity);
   const isPrivateActivity = activity.visibility === "PRIVATE";
+  const isOrganizer = viewerProfile?.id === activity.organizer.id;
+  const isTeamOperator = Boolean(activity.viewerCanManage) || isOrganizer;
   const shareToken =
-    isPrivateActivity && viewerProfile?.id === activity.organizer.id
+    isPrivateActivity && isTeamOperator
       ? await ensurePrivateActivityShareToken(activity.id)
       : activity.shareEnabled && activity.shareToken
         ? activity.shareToken
         : null;
+
+  if (
+    isPrivateActivity &&
+    isTeamOperator &&
+    shareToken &&
+    accessToken !== shareToken
+  ) {
+    redirect(
+      getPrivateActivitySharePath({
+        activityId: activity.id,
+        extraSearchParams: {
+          claimed: claimedSuccess,
+          sheet,
+        },
+        locale,
+        shareToken,
+      }),
+    );
+  }
+
   const privateSharePath =
     isPrivateActivity && (accessToken || shareToken)
       ? getPrivateActivitySharePath({
@@ -1437,8 +1462,6 @@ export async function ActivityDetailPageContent({
   const isCancelled = activity.status === "CANCELLED";
   const isFull =
     activity.capacity > 0 && activity.participantCount >= activity.capacity;
-  const isOrganizer = viewerProfile?.id === activity.organizer.id;
-  const isTeamOperator = Boolean(activity.viewerCanManage) || isOrganizer;
   const canCancelActivity =
     isOrganizer &&
     !isCancelled &&
@@ -2217,7 +2240,6 @@ export async function ActivityDetailPageContent({
                   activityTitle={activity.title}
                   accessToken={accessToken ?? null}
                   closeOnSuccess
-                  compactUnauthenticated
                   formInstanceId="mobile"
                   hideMessageHint
                   locale={locale}
@@ -2242,6 +2264,13 @@ export async function ActivityDetailPageContent({
                 ) : null}
               </div>
             </TeamDetailMobileCtaSheet>
+          ) : null}
+          {isAdmin && !isClosed && !isFull ? (
+            <AdminGuestParticipantControl
+              activityId={activity.id}
+              formInstanceId="mobile-admin"
+              locale={locale}
+            />
           ) : null}
         </div>
       </div>
@@ -2414,6 +2443,13 @@ export async function ActivityDetailPageContent({
                     locale={locale}
                   />
                 ) : null}
+                {isAdmin && !isClosed && !isFull ? (
+                  <AdminGuestParticipantControl
+                    activityId={activity.id}
+                    formInstanceId="desktop-operator"
+                    locale={locale}
+                  />
+                ) : null}
               </div>
               {showActivityRoomEntry ? (
                 <ActivityPlayAgainLink
@@ -2495,7 +2531,7 @@ export async function ActivityDetailPageContent({
                   activityId={activity.id}
                   activityTitle={activity.title}
                   accessToken={accessToken ?? null}
-                  compactUnauthenticated
+                  canAddGuest={isAdmin}
                   formInstanceId="desktop"
                   locale={locale}
                   requiresApproval={activity.requiresApproval}
