@@ -14,6 +14,7 @@ import { normalizeAnalyticsLocale } from "@/features/analytics/events";
 import { queueAnalyticsEvent } from "@/features/analytics/server";
 import { getActivityDetailPath } from "@/features/activities/utils/activityRoutes";
 import { createNotification } from "@/features/notifications/utils/createNotification";
+import { isCurrentUserAdmin } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
 import {
   normalizeGuestEmail,
@@ -42,8 +43,11 @@ const activeOrganizerStatuses: UserProfileStatus[] = ["ACTIVE"];
 const guestJoinSchema = z.object({
   activityId: z.string().min(1, "活动不存在"),
   locale: z.string().min(1).default("zh-CN"),
-  accessToken: z.string().trim().optional(),
-  displayName: z.string().trim().min(1, "请填写名字或昵称").max(24, "名字最多 24 个字"),
+  displayName: z
+    .string()
+    .trim()
+    .min(1, "请填写名字或昵称")
+    .max(24, "名字最多 24 个字"),
   phone: z.string().trim().max(40, "电话过长").optional(),
   email: z
     .string()
@@ -61,7 +65,6 @@ export type GuestJoinActivityState = {
   activityId?: string;
   fieldErrors?: Record<string, string[]>;
   formError?: string;
-  guestStatus?: "JOINED" | "PENDING" | "APPROVED" | null;
   success?: boolean;
   values?: {
     displayName: string;
@@ -150,13 +153,20 @@ export async function joinActivityAsGuestAction(
   const rawInput = {
     activityId: getString(formData, "activityId"),
     locale: getString(formData, "locale") || "zh-CN",
-    accessToken: getString(formData, "accessToken") || undefined,
     displayName: getString(formData, "displayName"),
     phone: getString(formData, "phone"),
     email: getString(formData, "email"),
     wechatId: getString(formData, "wechatId"),
     message: getString(formData, "message"),
   };
+
+  if (!(await isCurrentUserAdmin())) {
+    return {
+      formError: "只有网站管理员可以添加游客。",
+      values: getValues(rawInput),
+    };
+  }
+
   const result = guestJoinSchema.safeParse(rawInput);
 
   if (!result.success) {
@@ -167,7 +177,7 @@ export async function joinActivityAsGuestAction(
 
     return {
       fieldErrors: fieldErrors as Record<string, string[]>,
-      formError: fieldErrors.contact?.[0] ?? "请检查游客报名信息。",
+      formError: fieldErrors.contact?.[0] ?? "请检查游客信息。",
       values: getValues(rawInput),
     };
   }
@@ -178,7 +188,6 @@ export async function joinActivityAsGuestAction(
   const requestHeaders = await headers();
   const userAgent = requestHeaders.get("user-agent");
   const sourceFingerprint = getSourceFingerprint(requestHeaders);
-  let successfulStatus: ParticipantStatus | null = null;
 
   try {
     const joinResult = await prisma.$transaction(
@@ -195,9 +204,6 @@ export async function joinActivityAsGuestAction(
             startAt: true,
             endAt: true,
             capacity: true,
-            requiresApproval: true,
-            shareEnabled: true,
-            shareToken: true,
             organizer: {
               select: {
                 status: true,
@@ -236,17 +242,11 @@ export async function joinActivityAsGuestAction(
           return { ok: false as const, error: "活动不存在或已不可见。" };
         }
 
-        const hasSharedLinkAccess =
-          Boolean(result.data.accessToken) &&
-          activity.shareEnabled &&
-          activity.shareToken === result.data.accessToken;
-
-        if (activity.visibility === "PRIVATE" && !hasSharedLinkAccess) {
-          return { ok: false as const, error: "这是私人局，请使用邀请链接报名。" };
-        }
-
         if (activity.status === "CANCELLED" || activity.status === "ENDED") {
-          return { ok: false as const, error: "活动已结束或取消，不能继续报名。" };
+          return {
+            ok: false as const,
+            error: "活动已结束或取消，不能继续报名。",
+          };
         }
 
         if (!joinableActivityStatuses.includes(activity.status)) {
@@ -261,26 +261,25 @@ export async function joinActivityAsGuestAction(
           const recentAttemptThreshold = new Date(
             Date.now() - guestJoinRateLimitWindowMs,
           );
-          const [activityAttemptCount, globalAttemptCount] =
-            await Promise.all([
-              tx.guestActivityParticipant.count({
-                where: {
-                  activityId: activity.id,
-                  createdAt: {
-                    gte: recentAttemptThreshold,
-                  },
-                  sourceFingerprint,
+          const [activityAttemptCount, globalAttemptCount] = await Promise.all([
+            tx.guestActivityParticipant.count({
+              where: {
+                activityId: activity.id,
+                createdAt: {
+                  gte: recentAttemptThreshold,
                 },
-              }),
-              tx.guestActivityParticipant.count({
-                where: {
-                  createdAt: {
-                    gte: recentAttemptThreshold,
-                  },
-                  sourceFingerprint,
+                sourceFingerprint,
+              },
+            }),
+            tx.guestActivityParticipant.count({
+              where: {
+                createdAt: {
+                  gte: recentAttemptThreshold,
                 },
-              }),
-            ]);
+                sourceFingerprint,
+              },
+            }),
+          ]);
 
           if (
             isGuestJoinRateLimited({
@@ -329,12 +328,7 @@ export async function joinActivityAsGuestAction(
           return { ok: false as const, error: "活动名额已满，不能继续报名。" };
         }
 
-        const nextStatus: ParticipantStatus =
-          activity.visibility === "PRIVATE" && hasSharedLinkAccess
-            ? "PENDING"
-            : activity.requiresApproval
-              ? "PENDING"
-              : "APPROVED";
+        const nextStatus: ParticipantStatus = "APPROVED";
 
         await tx.guestActivityParticipant.create({
           data: {
@@ -359,7 +353,6 @@ export async function joinActivityAsGuestAction(
           activityId: activity.id,
           organizerId: activity.organizerId,
           status: nextStatus,
-          requiresApproval: activity.requiresApproval,
         };
       },
       {
@@ -374,16 +367,11 @@ export async function joinActivityAsGuestAction(
       };
     }
 
-    successfulStatus = joinResult.status;
-
     await createNotification(prisma, {
       actorDisplayName: result.data.displayName,
       activityId: joinResult.activityId,
       recipientId: joinResult.organizerId,
-      type:
-        joinResult.status === "PENDING"
-          ? "PARTICIPATION_PENDING"
-          : "PARTICIPATION_CONFIRMED",
+      type: "PARTICIPATION_CONFIRMED",
     }).catch((error) => {
       console.error("Failed to create guest participation notification", error);
     });
@@ -397,8 +385,8 @@ export async function joinActivityAsGuestAction(
       sourceSurface: "activity_detail",
       properties: {
         participant_status: joinResult.status,
-        requires_approval: joinResult.requiresApproval,
-        submitter_kind: "guest",
+        requires_approval: false,
+        submitter_kind: "admin_guest",
       },
     });
   } catch (error) {
@@ -409,20 +397,16 @@ export async function joinActivityAsGuestAction(
       };
     }
 
-    console.error("Failed to join activity as guest", error);
+    console.error("Failed to add guest participant", error);
 
     return {
-      formError: "游客报名失败，请稍后重试。",
+      formError: "添加游客失败，请稍后重试。",
       values: getValues(rawInput),
     };
   }
 
   return {
     activityId: result.data.activityId,
-    guestStatus:
-      successfulStatus === "PENDING" || successfulStatus === "APPROVED"
-        ? successfulStatus
-        : null,
     success: true,
   };
 }

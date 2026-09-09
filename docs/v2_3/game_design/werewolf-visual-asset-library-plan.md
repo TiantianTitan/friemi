@@ -22,7 +22,7 @@
 当前保留资源：
 
 ```text
-apps/web/public/game-tools/werewolf/werewolf.jpeg
+apps/web/public/game-tools/werewolf/werewolf.png
 apps/web/public/game-tools/werewolf/recto
 apps/web/public/game-tools/werewolf/verso
 ```

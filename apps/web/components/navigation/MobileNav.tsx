@@ -19,7 +19,8 @@ function shouldHideMobileNav(pathname: string, locale: string) {
   return (
     pathname === withLocale(locale, "/game-tools") ||
     pathname.startsWith(`${withLocale(locale, "/game-tools")}/`) ||
-    pathname.startsWith(`${withLocale(locale, "/messages")}/`)
+    pathname.startsWith(`${withLocale(locale, "/messages")}/`) ||
+    pathname.startsWith(`${withLocale(locale, "/top-news")}/`)
   );
 }
 

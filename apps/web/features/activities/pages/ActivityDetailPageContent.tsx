@@ -51,7 +51,10 @@ import { ActivityShareTools } from "@/features/activities/components/ActivitySha
 import { getActivityPriorityAdminSnapshot } from "@/features/activities/priority/adminActivityPriority";
 import { CancelParticipationForm } from "@/features/activities/components/CancelParticipationForm";
 import { CancelActivityForm } from "@/features/activities/components/CancelActivityForm";
-import { JoinActivityForm } from "@/features/activities/components/JoinActivityForm";
+import {
+  AdminGuestParticipantControl,
+  JoinActivityForm,
+} from "@/features/activities/components/JoinActivityForm";
 import { ParticipationApprovalPanel } from "@/features/activities/components/ParticipationApprovalPanel";
 import { BoardGameToolFloatingEntry } from "@/features/activities/components/BoardGameToolFloatingEntry";
 import { TeamDetailMobileCtaSheet } from "@/features/activities/components/TeamDetailMobileCtaSheet";
@@ -2217,7 +2220,6 @@ export async function ActivityDetailPageContent({
                   activityTitle={activity.title}
                   accessToken={accessToken ?? null}
                   closeOnSuccess
-                  compactUnauthenticated
                   formInstanceId="mobile"
                   hideMessageHint
                   locale={locale}
@@ -2242,6 +2244,13 @@ export async function ActivityDetailPageContent({
                 ) : null}
               </div>
             </TeamDetailMobileCtaSheet>
+          ) : null}
+          {isAdmin && !isClosed && !isFull ? (
+            <AdminGuestParticipantControl
+              activityId={activity.id}
+              formInstanceId="mobile-admin"
+              locale={locale}
+            />
           ) : null}
         </div>
       </div>
@@ -2414,6 +2423,13 @@ export async function ActivityDetailPageContent({
                     locale={locale}
                   />
                 ) : null}
+                {isAdmin && !isClosed && !isFull ? (
+                  <AdminGuestParticipantControl
+                    activityId={activity.id}
+                    formInstanceId="desktop-operator"
+                    locale={locale}
+                  />
+                ) : null}
               </div>
               {showActivityRoomEntry ? (
                 <ActivityPlayAgainLink
@@ -2495,7 +2511,7 @@ export async function ActivityDetailPageContent({
                   activityId={activity.id}
                   activityTitle={activity.title}
                   accessToken={accessToken ?? null}
-                  compactUnauthenticated
+                  canAddGuest={isAdmin}
                   formInstanceId="desktop"
                   locale={locale}
                   requiresApproval={activity.requiresApproval}

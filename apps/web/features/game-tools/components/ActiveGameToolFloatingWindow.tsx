@@ -10,6 +10,7 @@ import {
   DISMISSED_ACTIVE_GAME_TOOL_ROOM_STORAGE_KEY,
   type StoredActiveGameToolRoom,
 } from "@/features/game-tools/activeGameToolRoomStorage";
+import { withLocale } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 type ActiveGameToolFloatingWindowProps = {
@@ -182,6 +183,10 @@ export function ActiveGameToolFloatingWindow({
       : storedRoom && storedRoom.id !== dismissedRoomId
         ? storedRoom
         : null;
+
+  if (pathname.startsWith(`${withLocale(locale, "/top-news")}/`)) {
+    return null;
+  }
 
   if (!currentRoom) {
     return null;

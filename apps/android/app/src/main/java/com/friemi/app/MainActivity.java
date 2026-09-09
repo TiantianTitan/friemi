@@ -11,6 +11,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -24,7 +25,6 @@ import android.os.Message;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.Window;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
 import android.webkit.ValueCallback;
@@ -46,6 +46,11 @@ import android.widget.Toast;
 
 import androidx.browser.customtabs.CustomTabColorSchemeParams;
 import androidx.browser.customtabs.CustomTabsIntent;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.google.mlkit.vision.barcode.common.Barcode;
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanner;
@@ -83,6 +88,7 @@ public final class MainActivity extends Activity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private WebView webView;
+    private FrameLayout rootView;
     private ProgressBar progressBar;
     private LinearLayout loadingOverlay;
     private TextView loadingSubtitle;
@@ -129,10 +135,15 @@ public final class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         configureWindow();
-        if (webView != null) {
-            webView.post(() -> injectAndroidAppContext(false));
-        }
+        refreshSafeArea();
         maybeResumePendingAuthBrowser();
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        configureWindow();
+        refreshSafeArea();
     }
 
     @Override
@@ -159,24 +170,23 @@ public final class MainActivity extends Activity {
     }
 
     private void configureWindow() {
-        Window window = getWindow();
-        window.setStatusBarColor(getColorCompat(R.color.friemi_mist));
-        window.setNavigationBarColor(getColorCompat(R.color.friemi_mist));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            window.getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
-            );
-        }
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(
+            getWindow(),
+            getWindow().getDecorView()
+        );
+        controller.setAppearanceLightStatusBars(true);
+        controller.setAppearanceLightNavigationBars(true);
     }
 
     private void setupViews() {
-        FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(getColorCompat(R.color.friemi_paper));
+        rootView = new FrameLayout(this);
+        rootView.setBackgroundColor(getColorCompat(R.color.friemi_paper));
 
         webView = new WebView(this);
         webView.setId(View.generateViewId());
         webView.setBackgroundColor(getColorCompat(R.color.friemi_paper));
-        root.addView(
+        rootView.addView(
             webView,
             new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -193,10 +203,10 @@ public final class MainActivity extends Activity {
             dp(3),
             Gravity.TOP
         );
-        root.addView(progressBar, progressParams);
+        rootView.addView(progressBar, progressParams);
 
         loadingOverlay = buildLoadingOverlay();
-        root.addView(
+        rootView.addView(
             loadingOverlay,
             new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -206,7 +216,7 @@ public final class MainActivity extends Activity {
 
         errorOverlay = buildErrorOverlay();
         errorOverlay.setVisibility(View.GONE);
-        root.addView(
+        rootView.addView(
             errorOverlay,
             new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -214,7 +224,24 @@ public final class MainActivity extends Activity {
             )
         );
 
-        setContentView(root);
+        ViewCompat.setOnApplyWindowInsetsListener(rootView, (view, insets) -> {
+            if (webView != null) {
+                webView.post(() -> injectAndroidAppContext(false));
+            }
+            return insets;
+        });
+        setContentView(rootView);
+        ViewCompat.requestApplyInsets(rootView);
+    }
+
+    private void refreshSafeArea() {
+        if (rootView != null) {
+            ViewCompat.requestApplyInsets(rootView);
+            return;
+        }
+        if (webView != null) {
+            webView.post(() -> injectAndroidAppContext(false));
+        }
     }
 
     private LinearLayout buildLoadingOverlay() {
@@ -834,33 +861,38 @@ public final class MainActivity extends Activity {
 
     private JSONObject getSafeAreaJson() throws JSONException {
         JSONObject safeArea = new JSONObject();
-        int statusBarHeightPx = getSystemInsetTopPx();
-        int navigationBarHeightPx = getSystemInsetBottomPx();
-        int topOverlapPx = getWebViewTopOverlapPx(statusBarHeightPx);
-        int bottomOverlapPx = getWebViewBottomOverlapPx(navigationBarHeightPx);
+        Insets systemInsets = getSystemInsets();
+        int topOverlapPx = getWebViewTopOverlapPx(systemInsets.top);
+        int bottomOverlapPx = getWebViewBottomOverlapPx(systemInsets.bottom);
+        int leftOverlapPx = getWebViewLeftOverlapPx(systemInsets.left);
+        int rightOverlapPx = getWebViewRightOverlapPx(systemInsets.right);
 
-        safeArea.put("statusBarHeight", pxToCssPx(statusBarHeightPx));
-        safeArea.put("navigationBarHeight", pxToCssPx(navigationBarHeightPx));
+        safeArea.put("statusBarHeight", pxToCssPx(systemInsets.top));
+        safeArea.put("navigationBarHeight", pxToCssPx(systemInsets.bottom));
         safeArea.put("top", pxToCssPx(topOverlapPx));
         safeArea.put("bottom", pxToCssPx(bottomOverlapPx));
+        safeArea.put("left", pxToCssPx(leftOverlapPx));
+        safeArea.put("right", pxToCssPx(rightOverlapPx));
 
         return safeArea;
     }
 
-    private int getSystemInsetTopPx() {
-        android.view.WindowInsets insets = getWindow().getDecorView().getRootWindowInsets();
-        if (insets != null && insets.getSystemWindowInsetTop() > 0) {
-            return insets.getSystemWindowInsetTop();
+    private Insets getSystemInsets() {
+        WindowInsetsCompat windowInsets = ViewCompat.getRootWindowInsets(
+            getWindow().getDecorView()
+        );
+        if (windowInsets != null) {
+            return windowInsets.getInsets(
+                WindowInsetsCompat.Type.systemBars() |
+                    WindowInsetsCompat.Type.displayCutout()
+            );
         }
-        return getSystemDimensionPx("status_bar_height");
-    }
-
-    private int getSystemInsetBottomPx() {
-        android.view.WindowInsets insets = getWindow().getDecorView().getRootWindowInsets();
-        if (insets != null && insets.getSystemWindowInsetBottom() > 0) {
-            return insets.getSystemWindowInsetBottom();
-        }
-        return getSystemDimensionPx("navigation_bar_height");
+        return Insets.of(
+            0,
+            getSystemDimensionPx("status_bar_height"),
+            0,
+            getSystemDimensionPx("navigation_bar_height")
+        );
     }
 
     private int getSystemDimensionPx(String name) {
@@ -875,22 +907,55 @@ public final class MainActivity extends Activity {
         if (webView == null || statusBarHeightPx <= 0) {
             return 0;
         }
-        int[] location = new int[2];
-        webView.getLocationOnScreen(location);
-        return Math.max(0, statusBarHeightPx - Math.max(0, location[1]));
+        int[] webViewLocation = new int[2];
+        int[] windowLocation = new int[2];
+        webView.getLocationOnScreen(webViewLocation);
+        getWindow().getDecorView().getLocationOnScreen(windowLocation);
+        int webViewTopPx = Math.max(0, webViewLocation[1] - windowLocation[1]);
+        return Math.max(0, statusBarHeightPx - webViewTopPx);
     }
 
     private int getWebViewBottomOverlapPx(int navigationBarHeightPx) {
         if (webView == null || navigationBarHeightPx <= 0) {
             return 0;
         }
-        int[] location = new int[2];
-        webView.getLocationOnScreen(location);
-        int webViewBottomPx = location[1] + webView.getHeight();
-        int screenHeightPx = getResources().getDisplayMetrics().heightPixels;
-        int freeBottomPx = Math.max(0, screenHeightPx - webViewBottomPx);
+        View decorView = getWindow().getDecorView();
+        int[] webViewLocation = new int[2];
+        int[] windowLocation = new int[2];
+        webView.getLocationOnScreen(webViewLocation);
+        decorView.getLocationOnScreen(windowLocation);
+        int webViewBottomPx = webViewLocation[1] + webView.getHeight();
+        int windowBottomPx = windowLocation[1] + decorView.getHeight();
+        int freeBottomPx = Math.max(0, windowBottomPx - webViewBottomPx);
 
         return Math.max(0, navigationBarHeightPx - freeBottomPx);
+    }
+
+    private int getWebViewLeftOverlapPx(int leftInsetPx) {
+        if (webView == null || leftInsetPx <= 0) {
+            return 0;
+        }
+        int[] webViewLocation = new int[2];
+        int[] windowLocation = new int[2];
+        webView.getLocationOnScreen(webViewLocation);
+        getWindow().getDecorView().getLocationOnScreen(windowLocation);
+        int freeLeftPx = Math.max(0, webViewLocation[0] - windowLocation[0]);
+        return Math.max(0, leftInsetPx - freeLeftPx);
+    }
+
+    private int getWebViewRightOverlapPx(int rightInsetPx) {
+        if (webView == null || rightInsetPx <= 0) {
+            return 0;
+        }
+        View decorView = getWindow().getDecorView();
+        int[] webViewLocation = new int[2];
+        int[] windowLocation = new int[2];
+        webView.getLocationOnScreen(webViewLocation);
+        decorView.getLocationOnScreen(windowLocation);
+        int webViewRightPx = webViewLocation[0] + webView.getWidth();
+        int windowRightPx = windowLocation[0] + decorView.getWidth();
+        int freeRightPx = Math.max(0, windowRightPx - webViewRightPx);
+        return Math.max(0, rightInsetPx - freeRightPx);
     }
 
     private int pxToCssPx(int physicalPx) {
@@ -919,6 +984,8 @@ public final class MainActivity extends Activity {
                 + "root.style.setProperty('--friemi-android-navigationbar-height',(safe.navigationBarHeight||0)+'px');"
                 + "root.style.setProperty('--friemi-android-top-inset',(safe.top||0)+'px');"
                 + "root.style.setProperty('--friemi-android-bottom-inset',(safe.bottom||0)+'px');"
+                + "root.style.setProperty('--friemi-android-left-inset',(safe.left||0)+'px');"
+                + "root.style.setProperty('--friemi-android-right-inset',(safe.right||0)+'px');"
                 + "window.dispatchEvent(new CustomEvent('friemi:android-safe-area',{detail:safe}));"
                 + dispatchReadyCode
                 + "}catch(error){}})(" + payloadJson + ");",

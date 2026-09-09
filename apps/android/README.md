@@ -18,7 +18,8 @@ Current branch scope:
 - Support image file picking from WebView forms
 - Show native loading and error states
 - Request and forward Firebase Cloud Messaging tokens when Firebase is configured
-- Lock orientation to portrait
+- Support portrait, landscape, foldable, and tablet window sizes
+- Handle Android system bars and display cutouts through edge-to-edge window insets
 
 FCM requires an Android Firebase config file. Without `google-services.json`, `FriemiAndroid.registerPushToken()` returns a structured `FIREBASE_NOT_CONFIGURED` result and the app keeps working without push.
 

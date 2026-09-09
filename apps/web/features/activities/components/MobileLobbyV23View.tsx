@@ -511,7 +511,7 @@ function MobileLobbyV23CategoryRail({
     <div
       aria-modal="true"
       aria-labelledby="mobile-lobby-category-rail-title"
-      className="mobile-lobby-category-drawer fixed inset-0 z-50 md:hidden"
+      className="mobile-lobby-category-drawer fixed inset-0 z-50"
       role="dialog"
     >
       <button
@@ -1035,7 +1035,7 @@ export function MobileLobbyV23View({
   });
 
   return (
-    <section className="mobile-v23-lobby app-mobile-page-shell [--app-mobile-page-top-gap:1.25rem] [--app-mobile-page-bottom-gap:1.1rem] bg-white text-[#111210] md:hidden">
+    <section className="mobile-v23-lobby app-mobile-page-shell [--app-mobile-page-top-gap:1.25rem] [--app-mobile-page-bottom-gap:1.1rem] bg-white text-[#111210]">
       <MobileLobbyV23CategoryRail
         activeCategory={activeCategory}
         isOpen={categoryRailOpen}

@@ -37,7 +37,7 @@ const mobileHomeTopNewsConfig: MobileHomeTopNewsConfigItem[] = [
     active: true,
     href: "/game-tools/werewolf",
     id: "werewolf-tool",
-    image: "/game-tools/werewolf/werewolf.jpeg",
+    image: "/game-tools/werewolf/werewolf.png",
     order: 20,
     title: {
       en: "Werewolf room tool",
