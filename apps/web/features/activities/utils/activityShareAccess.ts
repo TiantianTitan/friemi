@@ -9,14 +9,27 @@ export function generateActivityShareToken() {
 
 export function getPrivateActivitySharePath({
   activityId,
+  extraSearchParams,
   locale,
   shareToken,
 }: {
   activityId: string;
+  extraSearchParams?: {
+    claimed?: string | null;
+    sheet?: string | null;
+  };
   locale: string;
   shareToken: string;
 }) {
-  return `/${locale}${getActivityDetailPath(activityId)}?access=${encodeURIComponent(shareToken)}`;
+  const searchParams = new URLSearchParams({ access: shareToken });
+
+  for (const [key, value] of Object.entries(extraSearchParams ?? {})) {
+    if (value) {
+      searchParams.set(key, value);
+    }
+  }
+
+  return `/${locale}${getActivityDetailPath(activityId)}?${searchParams.toString()}`;
 }
 
 export async function ensurePrivateActivityShareToken(

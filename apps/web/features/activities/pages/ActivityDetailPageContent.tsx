@@ -980,12 +980,34 @@ export async function ActivityDetailPageContent({
 
   const weatherInput = getActivityWeatherWidgetInput(activity);
   const isPrivateActivity = activity.visibility === "PRIVATE";
+  const isOrganizer = viewerProfile?.id === activity.organizer.id;
+  const isTeamOperator = Boolean(activity.viewerCanManage) || isOrganizer;
   const shareToken =
-    isPrivateActivity && viewerProfile?.id === activity.organizer.id
+    isPrivateActivity && isTeamOperator
       ? await ensurePrivateActivityShareToken(activity.id)
       : activity.shareEnabled && activity.shareToken
         ? activity.shareToken
         : null;
+
+  if (
+    isPrivateActivity &&
+    isTeamOperator &&
+    shareToken &&
+    accessToken !== shareToken
+  ) {
+    redirect(
+      getPrivateActivitySharePath({
+        activityId: activity.id,
+        extraSearchParams: {
+          claimed: claimedSuccess,
+          sheet,
+        },
+        locale,
+        shareToken,
+      }),
+    );
+  }
+
   const privateSharePath =
     isPrivateActivity && (accessToken || shareToken)
       ? getPrivateActivitySharePath({
@@ -1440,8 +1462,6 @@ export async function ActivityDetailPageContent({
   const isCancelled = activity.status === "CANCELLED";
   const isFull =
     activity.capacity > 0 && activity.participantCount >= activity.capacity;
-  const isOrganizer = viewerProfile?.id === activity.organizer.id;
-  const isTeamOperator = Boolean(activity.viewerCanManage) || isOrganizer;
   const canCancelActivity =
     isOrganizer &&
     !isCancelled &&

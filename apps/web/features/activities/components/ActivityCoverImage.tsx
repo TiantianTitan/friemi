@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   defaultActivityCategoryIllustrationSrc,
   isActivityCategoryIllustrationSrc,
@@ -15,6 +15,7 @@ type ActivityCoverImageProps = {
   imageClassName?: string;
   loading?: "eager" | "lazy";
   overlayClassName?: string;
+  recoverySrc?: string | null;
   src: string | null;
 };
 
@@ -25,34 +26,57 @@ export function ActivityCoverImage({
   imageClassName,
   loading = "lazy",
   overlayClassName = "bg-black/20",
+  recoverySrc,
   src,
 }: ActivityCoverImageProps) {
   const [hasFailed, setHasFailed] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [usesRecovery, setUsesRecovery] = useState(false);
   const normalizedFallbackSrc = fallbackSrc?.trim() || null;
+  const normalizedPrimarySrc = src?.trim() || null;
+  const normalizedRecoverySrc = recoverySrc?.trim() || null;
+  const activeSrc = usesRecovery ? normalizedRecoverySrc : normalizedPrimarySrc;
   const usesCategoryArtworkCrop =
-    isActivityCategoryIllustrationSrc(src) &&
-    src !== defaultActivityCategoryIllustrationSrc;
+    isActivityCategoryIllustrationSrc(activeSrc) &&
+    activeSrc !== defaultActivityCategoryIllustrationSrc;
   const fallbackUsesCategoryArtworkCrop =
     isActivityCategoryIllustrationSrc(normalizedFallbackSrc) &&
     normalizedFallbackSrc !== defaultActivityCategoryIllustrationSrc;
   const primarySrc =
-    src && !hasFailed && src !== normalizedFallbackSrc ? src : null;
+    activeSrc && !hasFailed && activeSrc !== normalizedFallbackSrc
+      ? activeSrc
+      : null;
+
+  const handleSourceFailure = useCallback(() => {
+    setHasLoaded(false);
+
+    if (
+      !usesRecovery &&
+      normalizedRecoverySrc &&
+      normalizedRecoverySrc !== normalizedPrimarySrc
+    ) {
+      setUsesRecovery(true);
+      return;
+    }
+
+    setHasFailed(true);
+  }, [normalizedPrimarySrc, normalizedRecoverySrc, usesRecovery]);
 
   useEffect(() => {
     setHasFailed(false);
     setHasLoaded(false);
-  }, [src]);
+    setUsesRecovery(false);
+  }, [recoverySrc, src]);
 
   useEffect(() => {
-    if (!src || hasLoaded || hasFailed) {
+    if (!activeSrc || hasLoaded || hasFailed) {
       return;
     }
 
-    const timeoutId = window.setTimeout(() => setHasFailed(true), 12_000);
+    const timeoutId = window.setTimeout(handleSourceFailure, 12_000);
 
     return () => window.clearTimeout(timeoutId);
-  }, [hasFailed, hasLoaded, src]);
+  }, [activeSrc, handleSourceFailure, hasFailed, hasLoaded]);
 
   if ((!src || hasFailed) && !normalizedFallbackSrc) {
     return (
@@ -117,7 +141,7 @@ export function ActivityCoverImage({
           fetchPriority={fetchPriority}
           loading={loading}
           referrerPolicy="no-referrer"
-          onError={() => setHasFailed(true)}
+          onError={handleSourceFailure}
           onLoad={() => setHasLoaded(true)}
         />
       ) : null}

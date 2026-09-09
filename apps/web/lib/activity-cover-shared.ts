@@ -20,3 +20,20 @@ export function isHotlinkProtectedCoverUrl(imageUrl: string) {
     return false;
   }
 }
+
+export function isSupabaseActivityCoverUrl(imageUrl: string) {
+  try {
+    const url = new URL(imageUrl);
+
+    return (
+      url.protocol === "https:" &&
+      !url.username &&
+      !url.password &&
+      !url.port &&
+      url.hostname.endsWith(".supabase.co") &&
+      url.pathname.startsWith("/storage/v1/object/public/activity-covers/")
+    );
+  } catch {
+    return false;
+  }
+}
