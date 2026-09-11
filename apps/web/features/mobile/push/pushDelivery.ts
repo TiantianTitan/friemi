@@ -16,6 +16,7 @@ export function normalizePushLocale(value: string | null): PushCopyLocale {
 }
 
 export function getNotificationPath(input: {
+  aaTransactionId?: string | null;
   activityId: string | null;
   actorId?: string | null;
   conversationId?: string | null;
@@ -23,6 +24,11 @@ export function getNotificationPath(input: {
   planetSlug?: string | null;
   type: NotificationType;
 }) {
+  if (input.type.startsWith("AA_") && input.activityId) {
+    return input.aaTransactionId
+      ? `/lobby/${input.activityId}/aa/transactions/${input.aaTransactionId}`
+      : `/lobby/${input.activityId}/aa`;
+  }
   if (
     input.type === "MOMENT_LIKED" ||
     input.type === "MOMENT_COMMENTED" ||
@@ -148,6 +154,11 @@ export function getNotificationCopy(input: {
       PLANET_MESSAGE: `「${planetName}」有新消息`,
       ACTIVITY_ROOM_MESSAGE: `「${activityTitle}」群聊有新消息`,
       PLANET_JOIN_REQUEST: `${actorName} 申请加入「${planetName}」`,
+      AA_REVIEW_REQUIRED: `${activityTitle} 有一笔 AA 记录待审核`,
+      AA_ENTRY_UPDATED: `${activityTitle} 的 AA 记录有变更`,
+      AA_TRANSFER_CONFIRMATION: `${activityTitle} 有一笔转账待确认`,
+      AA_DISPUTE_OPENED: `${activityTitle} 有一笔核算争议`,
+      AA_PAYMENT_REQUEST: `${activityTitle} 有新的付款请求`,
     },
     en: {
       ACTIVITY_ANNOUNCEMENT: `${activityTitle} has a new announcement`,
@@ -176,6 +187,11 @@ export function getNotificationCopy(input: {
       PLANET_MESSAGE: `New messages in ${planetName}`,
       ACTIVITY_ROOM_MESSAGE: `New messages in ${activityTitle}`,
       PLANET_JOIN_REQUEST: `${actorName} asked to join ${planetName}`,
+      AA_REVIEW_REQUIRED: `${activityTitle} has an AA entry to review`,
+      AA_ENTRY_UPDATED: `${activityTitle} AA ledger was updated`,
+      AA_TRANSFER_CONFIRMATION: `${activityTitle} has a payment to confirm`,
+      AA_DISPUTE_OPENED: `${activityTitle} has a ledger dispute`,
+      AA_PAYMENT_REQUEST: `${activityTitle} has a payment request`,
     },
     fr: {
       ACTIVITY_ANNOUNCEMENT: `${activityTitle} a une nouvelle annonce`,
@@ -204,6 +220,11 @@ export function getNotificationCopy(input: {
       PLANET_MESSAGE: `Nouveaux messages dans ${planetName}`,
       ACTIVITY_ROOM_MESSAGE: `Nouveaux messages dans ${activityTitle}`,
       PLANET_JOIN_REQUEST: `${actorName} demande à rejoindre ${planetName}`,
+      AA_REVIEW_REQUIRED: `${activityTitle} a une opération AA à valider`,
+      AA_ENTRY_UPDATED: `Le compte AA de ${activityTitle} a été mis à jour`,
+      AA_TRANSFER_CONFIRMATION: `${activityTitle} a un paiement à confirmer`,
+      AA_DISPUTE_OPENED: `${activityTitle} a un désaccord de compte`,
+      AA_PAYMENT_REQUEST: `${activityTitle} a une demande de paiement`,
     },
   };
 

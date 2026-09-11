@@ -9,6 +9,9 @@ const __dirname = path.dirname(__filename);
 
 const nextConfig: NextConfig = {
   experimental: {
+    serverActions: {
+      bodySizeLimit: "12mb",
+    },
     staleTimes: {
       dynamic: 3600,
       static: 3600,

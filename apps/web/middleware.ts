@@ -39,6 +39,7 @@ const isProtectedRoute = createRouteMatcher([
 ]);
 const isAdminPageRoute = createRouteMatcher(["/:locale/admin(.*)"]);
 const isAdminApiRoute = createRouteMatcher(["/api/admin(.*)"]);
+const isAaApiRoute = createRouteMatcher(["/api/aa(.*)"]);
 const isUploadApiRoute = createRouteMatcher(["/api/uploads(.*)"]);
 const isActivityRoomChatApiRoute = createRouteMatcher([
   "/api/activity-room-chat(.*)",
@@ -257,6 +258,21 @@ export default clerkMiddleware(async (auth, request) => {
     return withReferralCookie(request, NextResponse.next());
   }
 
+  if (isAaApiRoute(request)) {
+    if (hasClerkKeys()) {
+      const { userId } = await auth();
+
+      if (!userId) {
+        return withReferralCookie(
+          request,
+          NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 }),
+        );
+      }
+    }
+
+    return withReferralCookie(request, NextResponse.next());
+  }
+
   if (isActivityRoomChatApiRoute(request)) {
     return withReferralCookie(request, NextResponse.next());
   }
@@ -342,6 +358,7 @@ export const config = {
     "/:locale/updates",
     "/:locale/updates/:path*",
     "/api/admin/:path*",
+    "/api/aa/:path*",
     "/api/activity-room-chat/:path*",
     "/api/activity-room/:path*",
     "/api/chat/:path*",

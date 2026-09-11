@@ -82,10 +82,6 @@ export function ActivityAnnouncementDetailPanel({
     setAcknowledgedAnnouncementId(null);
   }, [latestAnnouncement?.id]);
 
-  if (!latestAnnouncement && !editor) {
-    return null;
-  }
-
   function handleAcknowledge() {
     if (!showUnreadDot || !latestAnnouncement) {
       return;

@@ -28,6 +28,7 @@ export function getVisibleNotificationWhere(
 
 const notificationSelect = {
   id: true,
+  aaTransactionId: true,
   type: true,
   readAt: true,
   createdAt: true,
@@ -90,6 +91,7 @@ type NotificationQueryResult = Prisma.NotificationGetPayload<{
 
 export type NotificationViewModel = {
   id: string;
+  aaTransactionId: string | null;
   type: NotificationType;
   readAt: string | null;
   createdAt: string;
@@ -142,6 +144,7 @@ function mapNotification(
 ): NotificationViewModel {
   return {
     id: notification.id,
+    aaTransactionId: notification.aaTransactionId,
     type: notification.type,
     readAt: notification.readAt?.toISOString() ?? null,
     createdAt: notification.createdAt.toISOString(),

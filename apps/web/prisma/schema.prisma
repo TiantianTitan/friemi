@@ -172,6 +172,11 @@ enum NotificationType {
   PLANET_MESSAGE
   ACTIVITY_ROOM_MESSAGE
   PLANET_JOIN_REQUEST
+  AA_REVIEW_REQUIRED
+  AA_ENTRY_UPDATED
+  AA_TRANSFER_CONFIRMATION
+  AA_DISPUTE_OPENED
+  AA_PAYMENT_REQUEST
 }
 
 enum ReportTargetType {
@@ -231,6 +236,74 @@ enum GameToolRoomStatus {
   IN_PROGRESS
   FINISHED
   CANCELLED
+}
+
+enum AaLedgerStatus {
+  ACTIVE
+  FROZEN
+  ARCHIVED
+}
+
+enum AaParticipantRole {
+  OWNER
+  ADMIN
+  MEMBER
+  GUEST
+}
+
+enum AaParticipantStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AaTransactionType {
+  EXPENSE
+  INCOME
+  TRANSFER
+}
+
+enum AaTransactionStatus {
+  PENDING_REVIEW
+  POSTED
+  REJECTED
+  PENDING_CONFIRMATION
+  DISPUTED
+  VOIDED
+}
+
+enum AaSplitMode {
+  EQUAL
+  WEIGHT
+  PERCENT
+  CUSTOM
+}
+
+enum AaAttachmentStatus {
+  UPLOADING
+  READY
+  FAILED
+}
+
+enum AaPaymentRequestStatus {
+  DRAFT
+  SENT
+  VIEWED
+  DECLINED
+  CANCELLED
+  EXPIRED
+  COMPLETED
+}
+
+enum AaConflictStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+enum AaChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum GameToolSubmissionKind {
@@ -327,6 +400,8 @@ model UserProfile {
   gameToolRoomMembers     GameToolRoomMember[]          @relation("GameToolRoomMemberProfile")
   gameToolSeats           GameToolSeat[]                @relation("GameToolSeatProfile")
   reviewedCheckIns        ActivityParticipant[]         @relation("ActivityCheckInReviewer")
+  aaLedgersCreated        AaLedger[]                    @relation("AaLedgerCreator")
+  aaParticipations        AaParticipant[]               @relation("AaParticipantProfile")
   gameToolEvents          GameToolEvent[]               @relation("GameToolEventActor")
   gameToolSubmissions     GameToolSubmission[]          @relation("GameToolSubmissionProfile")
   gameToolPlayerRecords   GameToolPlayerRecord[]        @relation("GameToolPlayerRecordProfile")
@@ -562,6 +637,7 @@ model Activity {
   directMessages    DirectMessage[]
   announcements     ActivityAnnouncement[]
   trustScoreEvents  TrustScoreEvent[]
+  aaLedger          AaLedger?
   createdAt         DateTime                   @default(now())
   updatedAt         DateTime                   @updatedAt
 
@@ -1022,6 +1098,7 @@ model GuestActivityParticipant {
   linkedUserProfile   UserProfile?         @relation("GuestLinkedUser", fields: [linkedUserProfileId], references: [id], onDelete: SetNull)
   linkedParticipantId String?              @unique
   linkedParticipant   ActivityParticipant? @relation("GuestLinkedParticipant", fields: [linkedParticipantId], references: [id], onDelete: SetNull)
+  aaParticipations    AaParticipant[]      @relation("AaParticipantGuest")
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 
@@ -1194,6 +1271,8 @@ model Notification {
   momentComment          MomentComment?        @relation(fields: [momentCommentId], references: [id], onDelete: SetNull)
   planetId               String?
   planet                 Planet?               @relation(fields: [planetId], references: [id], onDelete: SetNull)
+  aaTransactionId        String?
+  aaTransaction          AaTransaction?        @relation(fields: [aaTransactionId], references: [id], onDelete: SetNull)
   dedupeKey              String?               @unique @db.VarChar(80)
   readAt                 DateTime?
   createdAt              DateTime              @default(now())
@@ -1206,6 +1285,7 @@ model Notification {
   @@index([momentId])
   @@index([momentCommentId])
   @@index([planetId])
+  @@index([aaTransactionId])
 }
 
 model OfficialMessage {
@@ -1268,6 +1348,302 @@ model Report {
   @@index([status, createdAt])
   @@index([reporterId, createdAt])
   @@index([reviewerId])
+}
+
+model AaLedger {
+  id                          String             @id @default(cuid())
+  activityId                  String?            @unique
+  activity                    Activity?          @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  creatorId                   String?
+  creator                     UserProfile?       @relation("AaLedgerCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  titleSnapshot               String             @db.VarChar(160)
+  coverImageUrlSnapshot       String?
+  baseCurrency                String             @default("EUR") @db.Char(3)
+  timezone                    String             @default("Europe/Paris") @db.VarChar(64)
+  status                      AaLedgerStatus     @default(ACTIVE)
+  requireMemberReview         Boolean            @default(true)
+  requireTransferConfirmation Boolean            @default(true)
+  allowMemberCorrections      Boolean            @default(false)
+  version                     Int                @default(1)
+  frozenAt                    DateTime?
+  archivedAt                  DateTime?
+  settlementStartedAt         DateTime?
+  participants                AaParticipant[]
+  categories                  AaCategory[]
+  transactions                AaTransaction[]
+  paymentRequests             AaPaymentRequest[]
+  auditEvents                 AaAuditEvent[]
+  createdAt                   DateTime           @default(now())
+  updatedAt                   DateTime           @updatedAt
+
+  @@index([creatorId, createdAt])
+  @@index([status, updatedAt])
+}
+
+model AaParticipant {
+  id                         String                    @id @default(cuid())
+  ledgerId                   String
+  ledger                     AaLedger                  @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  userProfileId              String?
+  userProfile                UserProfile?              @relation("AaParticipantProfile", fields: [userProfileId], references: [id], onDelete: SetNull)
+  guestActivityParticipantId String?
+  guestActivityParticipant   GuestActivityParticipant? @relation("AaParticipantGuest", fields: [guestActivityParticipantId], references: [id], onDelete: SetNull)
+  displayNameSnapshot        String                    @db.VarChar(80)
+  avatarUrlSnapshot          String?
+  role                       AaParticipantRole         @default(MEMBER)
+  status                     AaParticipantStatus       @default(ACTIVE)
+  joinedAt                   DateTime                  @default(now())
+  inactivatedAt              DateTime?
+  contributions              AaContribution[]
+  shares                     AaShare[]
+  createdTransactions        AaTransaction[]           @relation("AaTransactionCreator")
+  reviewedTransactions       AaTransaction[]           @relation("AaTransactionReviewer")
+  voidedTransactions         AaTransaction[]           @relation("AaTransactionVoider")
+  transfersSent              AaTransaction[]           @relation("AaTransferSender")
+  transfersReceived          AaTransaction[]           @relation("AaTransferRecipient")
+  payerConfirmedTransfers    AaTransaction[]           @relation("AaTransferPayerConfirmer")
+  payeeConfirmedTransfers    AaTransaction[]           @relation("AaTransferPayeeConfirmer")
+  attachments                AaAttachment[]
+  revisions                  AaTransactionRevision[]
+  changeRequestsCreated      AaChangeRequest[]         @relation("AaChangeRequestActor")
+  changeRequestsReviewed     AaChangeRequest[]         @relation("AaChangeRequestReviewer")
+  resolvedConflicts          AaConflict[]              @relation("AaConflictResolver")
+  paymentRequestsCreated     AaPaymentRequest[]        @relation("AaPaymentRequestCreator")
+  paymentRequestsSent        AaPaymentRequest[]        @relation("AaPaymentRequestFrom")
+  paymentRequestsReceived    AaPaymentRequest[]        @relation("AaPaymentRequestTo")
+  auditEvents                AaAuditEvent[]
+  createdAt                  DateTime                  @default(now())
+  updatedAt                  DateTime                  @updatedAt
+
+  @@unique([ledgerId, userProfileId])
+  @@unique([ledgerId, guestActivityParticipantId])
+  @@index([ledgerId, status])
+  @@index([userProfileId])
+  @@index([guestActivityParticipantId])
+}
+
+model AaCategory {
+  id           String          @id @default(cuid())
+  ledgerId     String
+  ledger       AaLedger        @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  name         String          @db.VarChar(60)
+  iconKey      String          @default("receipt") @db.VarChar(32)
+  sortOrder    Int             @default(0)
+  isActive     Boolean         @default(true)
+  transactions AaTransaction[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@unique([ledgerId, name])
+  @@index([ledgerId, isActive, sortOrder])
+}
+
+model AaTransaction {
+  id                        String                  @id @default(cuid())
+  ledgerId                  String
+  ledger                    AaLedger                @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  categoryId                String?
+  category                  AaCategory?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryNameSnapshot      String                  @default("其他") @db.VarChar(60)
+  type                      AaTransactionType
+  status                    AaTransactionStatus     @default(POSTED)
+  splitMode                 AaSplitMode?
+  title                     String                  @db.VarChar(120)
+  note                      String?                 @db.Text
+  originalCurrency          String                  @db.Char(3)
+  originalAmountMinor       BigInt
+  baseAmountMinor           BigInt
+  fxRate                    Decimal                 @default(1) @db.Decimal(24, 12)
+  fxRateSource              String?                 @db.VarChar(80)
+  fxRateDate                DateTime?
+  occurredAt                DateTime
+  creatorParticipantId      String
+  creator                   AaParticipant           @relation("AaTransactionCreator", fields: [creatorParticipantId], references: [id], onDelete: Restrict)
+  reviewedByParticipantId   String?
+  reviewer                  AaParticipant?          @relation("AaTransactionReviewer", fields: [reviewedByParticipantId], references: [id], onDelete: SetNull)
+  reviewedAt                DateTime?
+  rejectionReason           String?                 @db.VarChar(240)
+  transferFromParticipantId String?
+  transferFrom              AaParticipant?          @relation("AaTransferSender", fields: [transferFromParticipantId], references: [id], onDelete: Restrict)
+  transferToParticipantId   String?
+  transferTo                AaParticipant?          @relation("AaTransferRecipient", fields: [transferToParticipantId], references: [id], onDelete: Restrict)
+  payerConfirmedById        String?
+  payerConfirmer            AaParticipant?          @relation("AaTransferPayerConfirmer", fields: [payerConfirmedById], references: [id], onDelete: SetNull)
+  payerConfirmedAt          DateTime?
+  payeeConfirmedById        String?
+  payeeConfirmer            AaParticipant?          @relation("AaTransferPayeeConfirmer", fields: [payeeConfirmedById], references: [id], onDelete: SetNull)
+  payeeConfirmedAt          DateTime?
+  clientMutationId          String?                 @unique @db.VarChar(120)
+  importSource              String?                 @db.VarChar(40)
+  importRecordId            String?                 @db.VarChar(160)
+  version                   Int                     @default(1)
+  voidedAt                  DateTime?
+  voidedByParticipantId     String?
+  voidedBy                  AaParticipant?          @relation("AaTransactionVoider", fields: [voidedByParticipantId], references: [id], onDelete: SetNull)
+  contributions             AaContribution[]
+  shares                    AaShare[]
+  attachments               AaAttachment[]
+  revisions                 AaTransactionRevision[]
+  changeRequests            AaChangeRequest[]
+  conflicts                 AaConflict[]
+  linkedPaymentRequest      AaPaymentRequest?       @relation("AaPaymentRequestTransfer")
+  auditEvents               AaAuditEvent[]
+  notifications             Notification[]
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+
+  @@unique([ledgerId, importSource, importRecordId])
+  @@index([ledgerId, occurredAt, id])
+  @@index([ledgerId, status, updatedAt])
+  @@index([creatorParticipantId, createdAt])
+  @@index([transferFromParticipantId])
+  @@index([transferToParticipantId])
+}
+
+model AaContribution {
+  id            String        @id @default(cuid())
+  transactionId String
+  transaction   AaTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  participantId String
+  participant   AaParticipant @relation(fields: [participantId], references: [id], onDelete: Restrict)
+  amountMinor   BigInt
+  createdAt     DateTime      @default(now())
+
+  @@unique([transactionId, participantId])
+  @@index([participantId, transactionId])
+}
+
+model AaShare {
+  id            String        @id @default(cuid())
+  transactionId String
+  transaction   AaTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  participantId String
+  participant   AaParticipant @relation(fields: [participantId], references: [id], onDelete: Restrict)
+  amountMinor   BigInt
+  ruleValue     Decimal?      @db.Decimal(24, 12)
+  createdAt     DateTime      @default(now())
+
+  @@unique([transactionId, participantId])
+  @@index([participantId, transactionId])
+}
+
+model AaAttachment {
+  id                    String             @id @default(cuid())
+  transactionId         String
+  transaction           AaTransaction      @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  uploaderParticipantId String
+  uploader              AaParticipant      @relation(fields: [uploaderParticipantId], references: [id], onDelete: Restrict)
+  objectKey             String             @unique
+  fileName              String             @db.VarChar(180)
+  mimeType              String             @db.VarChar(100)
+  byteSize              Int
+  status                AaAttachmentStatus @default(UPLOADING)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@index([transactionId, createdAt])
+  @@index([uploaderParticipantId, createdAt])
+}
+
+model AaTransactionRevision {
+  id                 String        @id @default(cuid())
+  transactionId      String
+  transaction        AaTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  version            Int
+  actorParticipantId String
+  actor              AaParticipant @relation(fields: [actorParticipantId], references: [id], onDelete: Restrict)
+  snapshot           Json
+  changeSummary      String?       @db.VarChar(240)
+  createdAt          DateTime      @default(now())
+
+  @@unique([transactionId, version])
+  @@index([actorParticipantId, createdAt])
+}
+
+model AaChangeRequest {
+  id                      String                @id @default(cuid())
+  transactionId           String
+  transaction             AaTransaction         @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  actorParticipantId      String
+  actor                   AaParticipant         @relation("AaChangeRequestActor", fields: [actorParticipantId], references: [id], onDelete: Restrict)
+  expectedVersion         Int
+  proposedPayload         Json
+  status                  AaChangeRequestStatus @default(PENDING)
+  reviewedByParticipantId String?
+  reviewer                AaParticipant?        @relation("AaChangeRequestReviewer", fields: [reviewedByParticipantId], references: [id], onDelete: SetNull)
+  reviewedAt              DateTime?
+  rejectionReason         String?               @db.VarChar(240)
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+
+  @@index([transactionId, status, createdAt])
+  @@index([actorParticipantId, status, createdAt])
+  @@index([reviewedByParticipantId, createdAt])
+}
+
+model AaConflict {
+  id                      String           @id @default(cuid())
+  transactionId           String
+  transaction             AaTransaction    @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  clientVersion           Int
+  serverVersion           Int
+  proposedPayload         Json
+  status                  AaConflictStatus @default(OPEN)
+  resolvedByParticipantId String?
+  resolver                AaParticipant?   @relation("AaConflictResolver", fields: [resolvedByParticipantId], references: [id], onDelete: SetNull)
+  resolvedAt              DateTime?
+  createdAt               DateTime         @default(now())
+
+  @@index([transactionId, status, createdAt])
+  @@index([resolvedByParticipantId, createdAt])
+}
+
+model AaPaymentRequest {
+  id                     String                 @id @default(cuid())
+  ledgerId               String
+  ledger                 AaLedger               @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  fromParticipantId      String
+  fromParticipant        AaParticipant          @relation("AaPaymentRequestFrom", fields: [fromParticipantId], references: [id], onDelete: Restrict)
+  toParticipantId        String
+  toParticipant          AaParticipant          @relation("AaPaymentRequestTo", fields: [toParticipantId], references: [id], onDelete: Restrict)
+  amountMinor            BigInt
+  currency               String                 @db.Char(3)
+  ledgerVersion          Int
+  status                 AaPaymentRequestStatus @default(DRAFT)
+  createdByParticipantId String
+  creator                AaParticipant          @relation("AaPaymentRequestCreator", fields: [createdByParticipantId], references: [id], onDelete: Restrict)
+  linkedTransferId       String?                @unique
+  linkedTransfer         AaTransaction?         @relation("AaPaymentRequestTransfer", fields: [linkedTransferId], references: [id], onDelete: SetNull)
+  sentAt                 DateTime?
+  viewedAt               DateTime?
+  expiresAt              DateTime?
+  completedAt            DateTime?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+
+  @@index([ledgerId, status, updatedAt])
+  @@index([fromParticipantId, status])
+  @@index([toParticipantId, status])
+}
+
+model AaAuditEvent {
+  id                 String         @id @default(cuid())
+  ledgerId           String
+  ledger             AaLedger       @relation(fields: [ledgerId], references: [id], onDelete: Cascade)
+  transactionId      String?
+  transaction        AaTransaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  actorParticipantId String?
+  actor              AaParticipant? @relation(fields: [actorParticipantId], references: [id], onDelete: SetNull)
+  action             String         @db.VarChar(60)
+  entityType         String         @db.VarChar(40)
+  entityId           String
+  before             Json?
+  after              Json?
+  createdAt          DateTime       @default(now())
+
+  @@index([ledgerId, createdAt])
+  @@index([transactionId, createdAt])
+  @@index([actorParticipantId, createdAt])
 }
 
 model UserFollow {

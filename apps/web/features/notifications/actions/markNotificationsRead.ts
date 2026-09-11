@@ -273,6 +273,7 @@ export async function followBackFromNotificationClientAction(
       type: "FRIEND_REQUEST",
     }),
     select: {
+      aaTransactionId: true,
       actor: {
         select: {
           id: true,
@@ -402,6 +403,7 @@ export async function openNotificationActivityAction(formData: FormData) {
       recipientId: profile.id,
     }),
     select: {
+      aaTransactionId: true,
       actorId: true,
       activityId: true,
       momentId: true,
@@ -642,8 +644,11 @@ export async function openNotificationActivityAction(formData: FormData) {
 
   revalidatePath(withLocale(locale, "/notifications"));
 
-  const target =
-    notification.type === "PARTICIPATION_PENDING" && notification.actorId
+  const target = notification.type.startsWith("AA_")
+    ? notification.aaTransactionId
+      ? `/lobby/${notification.activityId}/aa/transactions/${notification.aaTransactionId}`
+      : `/lobby/${notification.activityId}/aa`
+    : notification.type === "PARTICIPATION_PENDING" && notification.actorId
       ? `${getActivityDetailPath(notification.activityId)}#participation-approval`
       : notification.type === "ACTIVITY_COMMENTED" ||
           notification.type === "COMMENT_REPLY"
