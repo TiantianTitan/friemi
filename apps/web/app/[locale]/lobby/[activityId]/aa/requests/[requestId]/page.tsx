@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { ArrowLeft, CircleDollarSign, Clock3, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock3, ReceiptText, X } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { MobileNavSectionOverride } from "@/components/navigation/MobileNavSectionOverride";
+import { AaPaymentMethods } from "@/features/aa/components/AaPaymentMethods";
 import { AaPaymentRequestShare } from "@/features/aa/components/AaPaymentRequestShare";
 import { formatMinorAmount } from "@/features/aa/domain/money";
 import { getActivityAaAccess } from "@/features/aa/server/access";
@@ -26,6 +27,14 @@ function minorToInput(amountMinor: bigint) {
   return `${whole}.${fraction}`;
 }
 
+function Initial({ name }: { name: string }) {
+  return (
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F1F2E3] text-[12px] font-black text-[#156240] ring-1 ring-[#D6D5B2]">
+      {Array.from(name.trim())[0]?.toUpperCase() ?? "?"}
+    </span>
+  );
+}
+
 export default async function AaPaymentRequestPage({ params }: PageProps) {
   const { activityId, locale, requestId } = await params;
   const profile = await ensureCurrentUserProfileSnapshot(
@@ -36,51 +45,68 @@ export default async function AaPaymentRequestPage({ params }: PageProps) {
   const request = access
     ? await prisma.aaPaymentRequest.findFirst({
         where: { id: requestId, ledger: { activityId } },
-        include: { creator: true, fromParticipant: true, toParticipant: true },
+        include: {
+          creator: true,
+          fromParticipant: true,
+          ledger: { select: { titleSnapshot: true } },
+          toParticipant: {
+            include: {
+              userProfile: {
+                select: { contactEmail: true, wechatId: true },
+              },
+            },
+          },
+        },
       })
     : null;
-  const backHref = withLocale(
-    locale,
-    `/lobby/${activityId}/aa?tab=settlement`,
-  );
+  const backHref = withLocale(locale, `/lobby/${activityId}/aa/progress`);
   const copy =
     locale === "fr"
       ? {
-          back: "Règlement",
+          back: "Progression",
           cancelled: "Cette demande n'est plus active.",
           cancel: "Annuler la demande",
-          heading: "Demande de paiement",
+          heading: "Détails du paiement",
           message: (from: string, to: string, amount: string) =>
             `${from} doit ${amount} à ${to} pour les dépenses partagées Friemi.`,
-          record: "Enregistrer le paiement",
+          payer: "Payeur",
+          personal: "À payer",
+          record: "Marquer comme payé",
+          total: "Montant",
         }
       : locale === "en"
         ? {
-            back: "Settlement",
+            back: "Progress",
             cancelled: "This request is no longer active.",
             cancel: "Cancel request",
-            heading: "Payment request",
+            heading: "Payment details",
             message: (from: string, to: string, amount: string) =>
               `${from} owes ${to} ${amount} for shared Friemi costs.`,
-            record: "Record payment",
+            payer: "Payer",
+            personal: "You pay",
+            record: "Mark as paid",
+            total: "Amount",
           }
         : {
-            back: "返回结算",
+            back: "返回结算进度",
             cancelled: "该付款请求已失效或取消。",
             cancel: "取消付款请求",
-            heading: "AA 付款请求",
+            heading: "付款详情",
             message: (from: string, to: string, amount: string) =>
               `${from}需要向${to}支付 ${amount}，用于结清 Friemi 聚吧共同开支。`,
-            record: "记录已付款",
+            payer: "付款给（垫付人）",
+            personal: "个人金额",
+            record: "标记已付款",
+            total: "总金额",
           };
 
   if (!request) {
     return (
-      <PageContainer className="max-w-xl py-5" mobileSafeTop>
+      <PageContainer className="max-w-[430px] bg-[#FEFFF9] py-5" mobileSafeTop>
         <Link className="text-sm font-bold text-[#156240]" href={backHref}>
           ← {copy.back}
         </Link>
-        <p className="mt-10 rounded-2xl bg-white p-6 text-center text-sm font-bold text-[#66736A]">
+        <p className="mt-10 rounded-[16px] border border-[#E7E1CE] bg-white p-6 text-center text-sm font-bold text-[#68736B]">
           {copy.cancelled}
         </p>
       </PageContainer>
@@ -104,64 +130,118 @@ export default async function AaPaymentRequestPage({ params }: PageProps) {
           where: { ledgerId: request.ledgerId, userProfileId: profile.id },
         });
   const canCancel = Boolean(
-    access?.canManage || viewerParticipant?.id === request.createdByParticipantId,
+    access?.canManage ||
+    viewerParticipant?.id === request.createdByParticipantId,
   );
   const active = request.status === "SENT" || request.status === "VIEWED";
+  const statusLabel = active
+    ? locale === "fr"
+      ? "En attente"
+      : locale === "en"
+        ? "Pending"
+        : "待付款"
+    : locale === "fr"
+      ? "Terminé"
+      : locale === "en"
+        ? "Completed"
+        : "已完成";
 
   return (
     <PageContainer
-      className="max-w-xl space-y-5 bg-[#FBFCF7] py-4 sm:py-8"
+      className="max-w-[430px] space-y-5 bg-[#FEFFF9] pb-8 pt-4 sm:py-8"
       mobileSafeBottom
       mobileSafeTop
     >
       <MobileNavSectionOverride section="activities" />
-      <header className="flex items-center gap-3">
+      <header className="grid grid-cols-[44px_1fr_44px] items-center">
         <Link
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#156240] ring-1 ring-[#D6D5B2]"
+          aria-label={copy.back}
+          className="flex h-10 w-10 items-center justify-center rounded-full text-[#1D1D1B] transition hover:bg-[#F1F2E3]"
           href={backHref}
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-[18px] w-[18px]" strokeWidth={1.8} />
         </Link>
-        <h1 className="text-xl font-black text-ink">{copy.heading}</h1>
+        <h1 className="text-center text-[17px] font-black text-[#1D1D1B]">
+          {copy.heading}
+        </h1>
+        <span />
       </header>
 
-      <section className="rounded-[1.6rem] bg-[#156240] p-6 text-center text-white shadow-[0_18px_40px_rgba(21,98,64,0.2)]">
-        <CircleDollarSign className="mx-auto h-7 w-7 text-white/80" />
-        <p className="mt-3 text-3xl font-black tabular-nums">{amount}</p>
-        <p className="mt-3 text-sm font-bold leading-6 text-white/80">
-          {request.fromParticipant.displayNameSnapshot} →{" "}
-          {request.toParticipant.displayNameSnapshot}
-        </p>
-        <p className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-white/65">
-          <Clock3 className="h-3 w-3" />
-          {request.status}
-        </p>
+      <section className="rounded-[16px] border border-[#E7E1CE] bg-white p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-bold text-[#8E8383]">{copy.total}</p>
+            <p className="mt-1 text-[27px] font-black tracking-[-0.03em] text-[#1D1D1B] friemi-tabular">
+              {amount}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-bold text-[#8E8383]">
+              {copy.personal}
+            </p>
+            <p className="mt-1 text-[15px] font-black text-[#1D1D1B] friemi-tabular">
+              {amount}
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 flex items-center gap-3 border-t border-[#EEEBDD] pt-4">
+          {request.toParticipant.avatarUrlSnapshot ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              alt=""
+              className="h-9 w-9 rounded-full object-cover ring-1 ring-[#D6D5B2]"
+              src={request.toParticipant.avatarUrlSnapshot}
+            />
+          ) : (
+            <Initial name={request.toParticipant.displayNameSnapshot} />
+          )}
+          <span className="min-w-0 flex-1">
+            <span className="block text-[10px] font-bold text-[#8E8383]">
+              {copy.payer}
+            </span>
+            <span className="mt-0.5 block truncate text-[12px] font-black text-[#1D1D1B]">
+              {request.toParticipant.displayNameSnapshot}
+            </span>
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-[#FFF5DD] px-2.5 py-1 text-[10px] font-bold text-[#8A641B]">
+            <Clock3 className="h-3 w-3" />
+            {statusLabel}
+          </span>
+        </div>
       </section>
 
+      <AaPaymentMethods
+        contactEmail={request.toParticipant.userProfile?.contactEmail ?? null}
+        locale={locale}
+        payeeName={request.toParticipant.displayNameSnapshot}
+        wechatId={request.toParticipant.userProfile?.wechatId ?? null}
+      />
+
       {active ? (
-        <section className="rounded-[1.3rem] border border-[#E3DFD0] bg-white p-5">
-          <p className="mb-5 text-center text-sm font-semibold leading-6 text-[#66736A]">
-            {message}
-          </p>
-          <AaPaymentRequestShare locale={locale} message={message} />
-        </section>
+        <AaPaymentRequestShare compact locale={locale} message={message} />
       ) : (
-        <p className="rounded-2xl bg-[#FFF0F2] px-4 py-3 text-center text-sm font-bold text-[#A53C50]">
+        <p className="rounded-[12px] bg-[#FFF0F2] px-4 py-3 text-center text-[11px] font-bold text-[#A53C50]">
           {copy.cancelled}
         </p>
       )}
 
       {active && request.fromParticipant.userProfileId === profile.id ? (
         <Link
-          className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#156240] text-sm font-bold text-white"
+          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[12px] bg-gradient-to-r from-[#156240] to-[#369758] text-[13px] font-bold text-white shadow-[0_10px_24px_rgba(21,98,64,0.16)]"
           href={withLocale(
             locale,
             `/lobby/${activityId}/aa/new?type=TRANSFER&from=${encodeURIComponent(request.fromParticipantId)}&to=${encodeURIComponent(request.toParticipantId)}&amount=${minorToInput(request.amountMinor)}`,
           )}
         >
+          <CheckCircle2 className="h-4 w-4" />
           {copy.record}
         </Link>
       ) : null}
+
+      <p className="flex items-start gap-2 rounded-[12px] bg-[#F2F7F0] px-3 py-2.5 text-[10px] font-semibold leading-5 text-[#66736A]">
+        <ReceiptText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#369758]" />
+        {message}
+      </p>
 
       {active && canCancel ? (
         <form action={cancelAaPaymentRequestAction}>
@@ -169,7 +249,7 @@ export default async function AaPaymentRequestPage({ params }: PageProps) {
           <input name="locale" type="hidden" value={locale} />
           <input name="requestId" type="hidden" value={request.id} />
           <button
-            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[#E7C4CB] text-xs font-bold text-[#A53C50]"
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[#E7C4CB] text-[11px] font-bold text-[#A53C50]"
             type="submit"
           >
             <X className="h-4 w-4" />

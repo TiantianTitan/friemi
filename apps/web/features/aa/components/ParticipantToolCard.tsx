@@ -13,6 +13,7 @@ type ParticipantPreview = {
 
 type ParticipantToolCardProps = {
   aaActionCount: number;
+  aaContent?: ReactNode;
   aaHref: string;
   aaUnavailable?: boolean;
   announcementContent?: ReactNode;
@@ -176,6 +177,7 @@ function ToolLink({
 
 export function ParticipantToolCard({
   aaActionCount,
+  aaContent,
   aaHref,
   aaUnavailable = false,
   announcementContent,
@@ -195,11 +197,11 @@ export function ParticipantToolCard({
   const copy = getCopy(locale);
   const preview = participants.slice(0, 5);
   const extraCount = Math.max(participantCount - preview.length, 0);
-  const [openPanel, setOpenPanel] = useState<"announcement" | "detail" | null>(
-    null,
-  );
+  const [openPanel, setOpenPanel] = useState<
+    "aa" | "announcement" | "detail" | null
+  >(null);
   const bare = variant === "bare";
-  const togglePanel = (panel: "announcement" | "detail") => {
+  const togglePanel = (panel: "aa" | "announcement" | "detail") => {
     setOpenPanel((current) => (current === panel ? null : panel));
   };
 
@@ -280,17 +282,31 @@ export function ParticipantToolCard({
             unread={announcementUnread}
           />
         )}
-        <ToolLink
-          badge={canAccessAa && !aaUnavailable ? aaActionCount : undefined}
-          disabled={aaUnavailable}
-          href={aaHref}
-          icon={<ReceiptText className="h-[18px] w-[18px]" />}
-          label={aaUnavailable ? copy.unavailable : copy.aa}
-        />
+        {bare && aaContent && !aaUnavailable ? (
+          <ToolButton
+            expanded={openPanel === "aa"}
+            icon={<ReceiptText className="h-[18px] w-[18px]" />}
+            label={copy.aa}
+            onClick={() => togglePanel("aa")}
+            unread={canAccessAa && aaActionCount > 0}
+          />
+        ) : (
+          <ToolLink
+            badge={canAccessAa && !aaUnavailable ? aaActionCount : undefined}
+            disabled={aaUnavailable}
+            href={aaHref}
+            icon={<ReceiptText className="h-[18px] w-[18px]" />}
+            label={aaUnavailable ? copy.unavailable : copy.aa}
+          />
+        )}
       </div>
       {bare && openPanel ? (
         <div className="mt-2 border-t border-[#EEEBDD] pt-4">
-          {openPanel === "detail" ? detailContent : announcementContent}
+          {openPanel === "detail"
+            ? detailContent
+            : openPanel === "announcement"
+              ? announcementContent
+              : aaContent}
         </div>
       ) : null}
     </section>

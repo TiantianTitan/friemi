@@ -4,22 +4,25 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUpRight,
+  BedDouble,
+  Camera,
+  CarFront,
   Check,
   ChevronRight,
-  CircleDollarSign,
   Download,
-  Clock3,
-  BarChart3,
   Filter,
-  LockKeyhole,
+  MoreHorizontal,
   Plus,
   ReceiptText,
   RotateCcw,
-  Settings2,
   ScrollText,
+  Settings2,
   ShieldCheck,
+  ShoppingBag,
   Snowflake,
-  WalletCards,
+  Ticket,
+  Utensils,
+  UsersRound,
 } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { MobileNavSectionOverride } from "@/components/navigation/MobileNavSectionOverride";
@@ -42,7 +45,6 @@ import {
   updateAaLedgerRulesAction,
   updateAaLedgerStatusAction,
 } from "@/features/aa/actions/aaLedgerActions";
-import { createAaPaymentRequestAction } from "@/features/aa/actions/aaPaymentRequestActions";
 import { cn } from "@/lib/utils";
 import { AaCsvImportForm } from "@/features/aa/components/AaCsvImportForm";
 import { AaLedgerShareTools } from "@/features/aa/components/AaLedgerShareTools";
@@ -52,33 +54,98 @@ export const dynamic = "force-dynamic";
 type PageProps = {
   params: Promise<{ locale: string; activityId: string }>;
   searchParams: Promise<{
-    tab?: string;
     q?: string;
     type?: string;
     status?: string;
-    category?: string;
-    member?: string;
-    from?: string;
-    to?: string;
     page?: string;
   }>;
 };
 
+function getUi(locale: string) {
+  if (locale === "fr") {
+    return {
+      all: "Tout",
+      details: "Détails",
+      entries: "Saisies",
+      filter: "Rechercher et filtrer",
+      filteredEmpty: "Aucune dépense ne correspond à ces filtres.",
+      participants: "Personnes",
+      pending: "à traiter",
+      progress: "Voir la progression",
+      reset: "Effacer",
+      search: "Titre, personne ou note",
+      spendList: "Liste des dépenses",
+      title: "Règlement",
+      upload: "Ajouter une dépense",
+      viewerReceive: "À recevoir",
+      viewerPay: "À payer",
+      viewerSettled: "À jour",
+    };
+  }
+  if (locale === "en") {
+    return {
+      all: "All",
+      details: "Details",
+      entries: "Entered",
+      filter: "Search and filter",
+      filteredEmpty: "No expenses match these filters.",
+      participants: "People",
+      pending: "to review",
+      progress: "View settlement progress",
+      reset: "Clear",
+      search: "Title, person or note",
+      spendList: "Expense list",
+      title: "Settlement",
+      upload: "Upload expense",
+      viewerReceive: "You receive",
+      viewerPay: "You pay",
+      viewerSettled: "All square",
+    };
+  }
+  return {
+    all: "全部",
+    details: "详情",
+    entries: "已上传",
+    filter: "搜索与筛选",
+    filteredEmpty: "没有符合当前筛选条件的开支。",
+    participants: "参与人数",
+    pending: "待处理",
+    progress: "查看结算进度",
+    reset: "清除",
+    search: "搜索标题、成员或备注",
+    spendList: "开支列表（预计）",
+    title: "结算",
+    upload: "上传开支",
+    viewerReceive: "你应收",
+    viewerPay: "你需付",
+    viewerSettled: "你已结清",
+  };
+}
+
 function getStatusTone(status: string) {
-  if (status === "POSTED") return "bg-[#ECF5EF] text-[#156240]";
+  if (status === "POSTED") return "bg-[#ECF5EF] text-[#369758]";
   if (status === "PENDING_REVIEW" || status === "PENDING_CONFIRMATION") {
-    return "bg-[#FFF5DD] text-[#7A5B13]";
+    return "bg-[#FFF5DD] text-[#8A641B]";
   }
   if (status === "REJECTED" || status === "DISPUTED") {
     return "bg-[#FFF0F2] text-[#A53C50]";
   }
-  return "bg-[#F1F2EC] text-[#6F756D]";
+  return "bg-[#F1F2E3] text-[#6F756D]";
 }
 
 function transactionIcon(type: string) {
   if (type === "INCOME") return ArrowDownLeft;
   if (type === "TRANSFER") return ArrowRight;
   return ArrowUpRight;
+}
+
+function categoryIcon(name: string) {
+  if (/餐|食|饭|酒|饮|dinner|food/i.test(name)) return Utensils;
+  if (/交通|车|taxi|transport/i.test(name)) return CarFront;
+  if (/住宿|酒店|hotel|stay/i.test(name)) return BedDouble;
+  if (/票|ticket/i.test(name)) return Ticket;
+  if (/购物|shop/i.test(name)) return ShoppingBag;
+  return ReceiptText;
 }
 
 function LedgerErrorState({
@@ -99,7 +166,7 @@ function LedgerErrorState({
         : copy.unavailable;
 
   return (
-    <PageContainer className="max-w-xl py-5 sm:py-10" mobileSafeTop>
+    <PageContainer className="max-w-[430px] bg-[#FEFFF9] py-5" mobileSafeTop>
       <MobileNavSectionOverride section="activities" />
       <Link
         className="inline-flex min-h-10 items-center gap-2 text-sm font-bold text-[#156240]"
@@ -108,12 +175,9 @@ function LedgerErrorState({
         <ArrowLeft className="h-4 w-4" />
         {copy.back}
       </Link>
-      <section className="mt-10 rounded-[1.5rem] border border-[#E3DFD0] bg-white p-6 text-center shadow-sm">
-        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#F1F2EC] text-[#607268]">
-          <LockKeyhole className="h-5 w-5" />
-        </span>
-        <h1 className="mt-4 text-xl font-black text-ink">{copy.title}</h1>
-        <p className="mt-2 text-sm font-semibold leading-6 text-[#66736A]">
+      <section className="mt-10 rounded-[16px] border border-[#E7E1CE] bg-white p-6 text-center">
+        <ReceiptText className="mx-auto h-6 w-6 text-[#369758]" />
+        <p className="mt-3 text-sm font-semibold leading-6 text-[#66736A]">
           {message}
         </p>
       </section>
@@ -121,52 +185,94 @@ function LedgerErrorState({
   );
 }
 
-function BalanceSummary({
-  snapshot,
+function CompactSummary({
   locale,
+  snapshot,
 }: {
-  snapshot: ActivityAaSnapshot;
   locale: string;
+  snapshot: ActivityAaSnapshot;
 }) {
-  const copy = getAaCopy(locale);
+  const ui = getUi(locale);
   const balance = BigInt(snapshot.viewer.balanceMinor);
+  const amount = balance < 0n ? -balance : balance;
   const balanceLabel =
-    balance > 0n ? copy.youReceive : balance < 0n ? copy.youPay : copy.balanced;
+    balance > 0n
+      ? ui.viewerReceive
+      : balance < 0n
+        ? ui.viewerPay
+        : ui.viewerSettled;
+  const pending =
+    snapshot.summary.pendingReviewCount +
+    snapshot.summary.pendingChangeCount +
+    snapshot.summary.pendingConfirmationCount;
 
   return (
-    <section className="overflow-hidden rounded-[1.55rem] bg-[#156240] text-white shadow-[0_18px_40px_rgba(21,98,64,0.2)]">
-      <div className="relative p-5 sm:p-6">
-        <div
-          aria-hidden="true"
-          className="absolute -right-8 -top-10 h-32 w-32 rounded-full border-[18px] border-white/5"
-        />
-        <p className="relative text-xs font-bold text-white/70">
-          {balanceLabel}
-        </p>
-        <p className="relative mt-1 text-[2rem] font-black leading-tight tabular-nums tracking-tight">
-          {formatMinorAmount(
-            balance < 0n ? -balance : balance,
-            snapshot.baseCurrency,
-            locale,
-          )}
-        </p>
-        <div className="relative mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/15 pt-4 text-xs font-semibold text-white/76">
-          <span>
-            {copy.totalExpense}{" "}
-            <strong className="ml-1 text-white">
-              {formatMinorAmount(
-                BigInt(snapshot.summary.expenseTotalMinor),
-                snapshot.baseCurrency,
-                locale,
-              )}
-            </strong>
+    <section className="rounded-[16px] border border-[#E7E1CE] bg-white p-4 shadow-[0_8px_24px_rgba(21,98,64,0.045)]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-bold text-[#8E8383]">
+            {locale === "fr"
+              ? "Dépenses totales"
+              : locale === "en"
+                ? "Total expenses"
+                : "总开支（预计）"}
+          </p>
+          <p className="mt-1 text-[28px] font-black leading-none tracking-[-0.035em] text-[#1D1D1B] friemi-tabular">
+            {formatMinorAmount(
+              BigInt(snapshot.summary.expenseTotalMinor),
+              snapshot.baseCurrency,
+              locale,
+            )}
+          </p>
+          <span
+            className={cn(
+              "mt-3 inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold",
+              pending > 0
+                ? "bg-[#FFF5DD] text-[#8A641B]"
+                : "bg-[#ECF5EF] text-[#369758]",
+            )}
+          >
+            {pending > 0 ? `${pending} ${ui.pending}` : balanceLabel}
           </span>
-          <span>
-            {snapshot.summary.postedCount} {copy.entries}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <ShieldCheck className="h-3.5 w-3.5" /> v{snapshot.version}
-          </span>
+        </div>
+        <div className="rounded-[12px] bg-[#F3F7F0] px-3 py-2 text-right">
+          <p className="text-[9px] font-bold text-[#8E8383]">{balanceLabel}</p>
+          <p className="mt-1 text-[14px] font-black text-[#156240] friemi-tabular">
+            {formatMinorAmount(amount, snapshot.baseCurrency, locale)}
+          </p>
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-3 border-t border-[#EEEBDD] pt-3">
+        <div>
+          <p className="text-[9px] font-bold text-[#8E8383]">{ui.entries}</p>
+          <p className="mt-1 text-[13px] font-black text-[#1D1D1B]">
+            {snapshot.summary.postedCount}
+          </p>
+        </div>
+        <div className="border-x border-[#EEEBDD] px-3">
+          <p className="text-[9px] font-bold text-[#8E8383]">
+            {ui.participants}
+          </p>
+          <p className="mt-1 text-[13px] font-black text-[#1D1D1B]">
+            {
+              snapshot.participants.filter(
+                (participant) => participant.status === "ACTIVE",
+              ).length
+            }
+          </p>
+        </div>
+        <div className="pl-3">
+          <p className="text-[9px] font-bold text-[#8E8383]">
+            {locale === "fr"
+              ? "Version"
+              : locale === "en"
+                ? "Version"
+                : "账本版本"}
+          </p>
+          <p className="mt-1 inline-flex items-center gap-1 text-[13px] font-black text-[#1D1D1B]">
+            <ShieldCheck className="h-3.5 w-3.5 text-[#369758]" />v
+            {snapshot.version}
+          </p>
         </div>
       </div>
     </section>
@@ -185,92 +291,63 @@ function TransactionRow({
   transaction: ActivityAaSnapshot["transactions"][number];
 }) {
   const copy = getAaCopy(locale);
-  const Icon = transactionIcon(transaction.type);
-  const typeLabel =
-    transaction.type === "EXPENSE"
-      ? copy.expense
-      : transaction.type === "INCOME"
-        ? copy.income
-        : copy.transfer;
+  const TypeIcon = transactionIcon(transaction.type);
+  const CategoryIcon = categoryIcon(transaction.categoryName);
+  const meta =
+    transaction.type === "TRANSFER"
+      ? `${transaction.transferFrom?.displayName} → ${transaction.transferTo?.displayName}`
+      : `${transaction.contributionNames.join("、")} · ${new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(transaction.occurredAt))}`;
 
   return (
-    <article className="rounded-[1.15rem] border border-[#E3DFD0] bg-white p-3.5 transition hover:border-[#C7DCCB]">
+    <article className="border-b border-[#EEEBDD] last:border-0">
       <Link
-        className="flex min-w-0 items-center gap-3"
+        className="flex min-h-[68px] items-center gap-3 py-3"
         href={withLocale(
           locale,
           `/lobby/${activityId}/aa/transactions/${transaction.id}`,
         )}
       >
-        <span
-          className={cn(
-            "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-            transaction.type === "INCOME"
-              ? "bg-[#E9F6EF] text-[#18734A]"
-              : transaction.type === "TRANSFER"
-                ? "bg-[#EEF1F7] text-[#50627B]"
-                : "bg-[#FFF1EC] text-[#B75D50]",
-          )}
-        >
-          <Icon className="h-4.5 w-4.5" />
+        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#F4F7F1] text-[#156240]">
+          <CategoryIcon className="h-[18px] w-[18px]" strokeWidth={1.7} />
+          <TypeIcon className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-white p-0.5 text-[#369758] ring-1 ring-[#D6D5B2]" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-sm font-bold text-ink">
-              {transaction.title}
-            </span>
-            <span
-              className={cn(
-                "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold",
-                getStatusTone(transaction.status),
-              )}
-            >
-              {getAaStatusLabel(locale, transaction.status)}
-            </span>
-            {transaction.pendingChange ? (
-              <span className="shrink-0 rounded-full bg-[#FFF5DD] px-2 py-0.5 text-[10px] font-bold text-[#7A5B13]">
-                {locale === "fr"
-                  ? "modif."
-                  : locale === "en"
-                    ? "change"
-                    : "待变更"}
-              </span>
-            ) : null}
+          <span className="block truncate text-[12px] font-black text-[#1D1D1B]">
+            {transaction.title}
           </span>
-          <span className="mt-1 block truncate text-[11px] font-semibold text-[#7C827A]">
-            {typeLabel} ·{" "}
-            {transaction.type === "TRANSFER"
-              ? `${transaction.transferFrom?.displayName} → ${transaction.transferTo?.displayName}`
-              : `${transaction.contributionNames.join("、")} · ${transaction.categoryName}`}
+          <span className="mt-1 block truncate text-[10px] font-semibold text-[#8E8383]">
+            {meta}
           </span>
         </span>
         <span className="shrink-0 text-right">
-          <span className="block text-sm font-black tabular-nums text-ink">
+          <span className="block text-[13px] font-black text-[#1D1D1B] friemi-tabular">
             {formatMinorAmount(
               BigInt(transaction.baseAmountMinor),
               snapshot.baseCurrency,
               locale,
             )}
           </span>
-          <span className="mt-1 block text-[10px] font-semibold text-[#90958E]">
-            {new Intl.DateTimeFormat(locale, {
-              month: "short",
-              day: "numeric",
-            }).format(new Date(transaction.occurredAt))}
+          <span
+            className={cn(
+              "mt-1 inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold",
+              getStatusTone(transaction.status),
+            )}
+          >
+            {getAaStatusLabel(locale, transaction.status)}
           </span>
         </span>
-        <ChevronRight className="h-4 w-4 shrink-0 text-[#A7ACA4]" />
+        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#B7B6AE]" />
       </Link>
 
       {transaction.canReview ? (
-        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[#EEEBDD] pt-3">
+        <div className="mb-3 grid grid-cols-2 gap-2 pl-[52px]">
           <form action={reviewAaTransactionAction}>
             <input name="activityId" type="hidden" value={activityId} />
             <input name="transactionId" type="hidden" value={transaction.id} />
             <input name="locale" type="hidden" value={locale} />
             <input name="decision" type="hidden" value="reject" />
             <button
-              className="min-h-9 w-full rounded-full border border-[#E7C4CB] text-xs font-bold text-[#A53C50]"
+              className="min-h-9 w-full rounded-full border border-[#E7C4CB] text-[10px] font-bold text-[#A53C50]"
               type="submit"
             >
               {copy.reject}
@@ -282,7 +359,7 @@ function TransactionRow({
             <input name="locale" type="hidden" value={locale} />
             <input name="decision" type="hidden" value="approve" />
             <button
-              className="min-h-9 w-full rounded-full bg-[#156240] text-xs font-bold text-white"
+              className="min-h-9 w-full rounded-full bg-[#369758] text-[10px] font-bold text-white"
               type="submit"
             >
               {copy.approve}
@@ -290,15 +367,12 @@ function TransactionRow({
           </form>
         </div>
       ) : transaction.canConfirm ? (
-        <form
-          action={confirmAaTransferAction}
-          className="mt-3 border-t border-[#EEEBDD] pt-3"
-        >
+        <form action={confirmAaTransferAction} className="mb-3 pl-[52px]">
           <input name="activityId" type="hidden" value={activityId} />
           <input name="transactionId" type="hidden" value={transaction.id} />
           <input name="locale" type="hidden" value={locale} />
           <button
-            className="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-full bg-[#156240] text-xs font-bold text-white"
+            className="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-full bg-[#369758] text-[10px] font-bold text-white"
             type="submit"
           >
             <Check className="h-3.5 w-3.5" />
@@ -316,8 +390,6 @@ export default async function AaLedgerPage({
 }: PageProps) {
   const { locale, activityId } = await params;
   const filters = await searchParams;
-  const { tab } = filters;
-  const activeTab = tab === "settlement" ? "settlement" : "details";
   const profile = await ensureCurrentUserProfileSnapshot(
     locale,
     `/lobby/${activityId}/aa`,
@@ -333,8 +405,10 @@ export default async function AaLedgerPage({
   }
 
   const copy = getAaCopy(locale);
+  const ui = getUi(locale);
   const backHref = withLocale(locale, `/lobby/${activityId}`);
   const newHref = withLocale(locale, `/lobby/${activityId}/aa/new`);
+  const progressHref = withLocale(locale, `/lobby/${activityId}/aa/progress`);
   const query = filters.q?.trim().toLocaleLowerCase(locale) ?? "";
   const filteredTransactions = snapshot.transactions.filter((transaction) => {
     const haystack = [
@@ -344,37 +418,18 @@ export default async function AaLedgerPage({
       transaction.creator.displayName,
       ...transaction.contributionNames,
       ...transaction.shares.map((share) => share.displayName),
-      transaction.transferFrom?.displayName ?? "",
-      transaction.transferTo?.displayName ?? "",
     ]
       .join(" ")
       .toLocaleLowerCase(locale);
-    const occurredOn = transaction.occurredAt.slice(0, 10);
-
     return (
       (!query || haystack.includes(query)) &&
       (!filters.type || transaction.type === filters.type) &&
-      (!filters.status || transaction.status === filters.status) &&
-      (!filters.category || transaction.categoryName === filters.category) &&
-      (!filters.member ||
-        transaction.relatedParticipantIds.includes(filters.member)) &&
-      (!filters.from || occurredOn >= filters.from) &&
-      (!filters.to || occurredOn <= filters.to)
+      (!filters.status || transaction.status === filters.status)
     );
   });
-  const hasFilters = Boolean(
-    query ||
-      filters.type ||
-      filters.status ||
-      filters.category ||
-      filters.member ||
-      filters.from ||
-      filters.to,
-  );
+  const hasFilters = Boolean(query || filters.type || filters.status);
   const requestedPage = Number.parseInt(filters.page ?? "1", 10);
-  const page = Number.isFinite(requestedPage)
-    ? Math.max(1, requestedPage)
-    : 1;
+  const page = Number.isFinite(requestedPage) ? Math.max(1, requestedPage) : 1;
   const pageSize = 100;
   const pageCount = Math.max(
     1,
@@ -386,341 +441,73 @@ export default async function AaLedgerPage({
     currentPage * pageSize,
   );
   const pageHref = (nextPage: number) => {
-    const params = new URLSearchParams();
+    const queryParams = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
-      if (key !== "page" && value) params.set(key, value);
+      if (key !== "page" && value) queryParams.set(key, value);
     });
-    params.set("page", String(nextPage));
-    return withLocale(locale, `/lobby/${activityId}/aa?${params.toString()}`);
-  };
-  const ui =
-    locale === "fr"
-      ? {
-          activityLog: "Journal d'activité",
-          all: "Tous",
-          category: "Catégorie",
-          filter: "Filtrer",
-          filteredEmpty: "Aucune opération ne correspond à ces filtres.",
-          from: "Du",
-          income: "Revenus",
-          member: "Membre",
-          reset: "Effacer",
-          request: "Demander le paiement",
-          search: "Rechercher un libellé, une personne ou une note",
-          statistics: "Statistiques",
-          to: "Au",
-          transfers: "Paiements confirmés",
-        }
-      : locale === "en"
-        ? {
-            activityLog: "Activity log",
-            all: "All",
-            category: "Category",
-            filter: "Apply filters",
-            filteredEmpty: "No entries match these filters.",
-            from: "From",
-            income: "Income",
-            member: "Member",
-            reset: "Clear",
-            request: "Request payment",
-            search: "Search title, person, or note",
-            statistics: "Statistics",
-            to: "To",
-            transfers: "Confirmed payments",
-          }
-        : {
-            activityLog: "活动记录",
-            all: "全部",
-            category: "分类",
-            filter: "筛选",
-            filteredEmpty: "没有符合当前筛选条件的记录。",
-            from: "开始日期",
-            income: "收入合计",
-            member: "相关成员",
-            reset: "清除",
-            request: "发送付款请求",
-            search: "搜索标题、成员或备注",
-            statistics: "统计概览",
-            to: "结束日期",
-            transfers: "已确认转账",
-          };
-  const filteredExpenseMinor = filteredTransactions
-    .filter(
-      (transaction) =>
-        transaction.type === "EXPENSE" && transaction.status === "POSTED",
-    )
-    .reduce(
-      (sum, transaction) => sum + BigInt(transaction.baseAmountMinor),
-      0n,
+    queryParams.set("page", String(nextPage));
+    return withLocale(
+      locale,
+      `/lobby/${activityId}/aa?${queryParams.toString()}`,
     );
+  };
 
   return (
     <PageContainer
-      className="max-w-4xl space-y-5 bg-[#FBFCF7] py-4 sm:py-8"
-      mobileSafeTop
+      className="max-w-[430px] space-y-5 bg-[#FEFFF9] pb-8 pt-4 sm:py-8"
       mobileSafeBottom
+      mobileSafeTop
     >
       <MobileNavSectionOverride section="activities" />
-      <header className="flex items-center gap-3">
+      <header className="grid grid-cols-[44px_1fr_44px] items-center">
         <Link
           aria-label={copy.back}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-[#156240] ring-1 ring-[#D6D5B2]"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-[#1D1D1B] transition hover:bg-[#F1F2E3]"
           href={backHref}
         >
-          <ArrowLeft className="h-4.5 w-4.5" />
+          <ArrowLeft className="h-[18px] w-[18px]" strokeWidth={1.8} />
         </Link>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-black text-ink">{copy.title}</h1>
-          <p className="truncate text-xs font-semibold text-[#7C827A]">
+        <div className="min-w-0 text-center">
+          <h1 className="text-[17px] font-black text-[#1D1D1B]">{ui.title}</h1>
+          <p className="mt-0.5 truncate text-[10px] font-semibold text-[#8E8383]">
             {snapshot.title}
           </p>
         </div>
-        {snapshot.status === "ACTIVE" ? (
-          <Link
-            className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-[#156240] px-4 text-sm font-bold text-white shadow-sm"
-            href={newHref}
-          >
-            <Plus className="h-4 w-4" />
-            {copy.add}
-          </Link>
-        ) : (
-          <span className="inline-flex items-center gap-1 rounded-full bg-[#EEF1F1] px-3 py-2 text-xs font-bold text-[#607268]">
-            <Snowflake className="h-3.5 w-3.5" />
-            {snapshot.status}
-          </span>
-        )}
+        <a
+          aria-label={copy.settings}
+          className="flex h-10 w-10 items-center justify-center rounded-full text-[#1D1D1B] transition hover:bg-[#F1F2E3]"
+          href="#aa-ledger-settings"
+        >
+          <MoreHorizontal className="h-[18px] w-[18px]" strokeWidth={1.8} />
+        </a>
       </header>
 
-      <BalanceSummary locale={locale} snapshot={snapshot} />
+      <CompactSummary locale={locale} snapshot={snapshot} />
 
-      <p className="rounded-2xl border border-[#E8E2CD] bg-[#FFFDF5] px-4 py-3 text-xs font-semibold leading-5 text-[#725F35]">
-        {copy.freeNotice}
-      </p>
       {snapshot.status !== "ACTIVE" ? (
-        <p className="rounded-2xl bg-[#EEF1F1] px-4 py-3 text-xs font-semibold text-[#607268]">
+        <p className="rounded-[12px] bg-[#F1F2E3] px-3 py-2.5 text-[10px] font-semibold text-[#68736B]">
           {copy.readonly}
         </p>
       ) : null}
 
-      <nav
-        aria-label={copy.title}
-        className="grid grid-cols-2 rounded-full bg-[#EEF3EC] p-1"
-      >
-        <Link
-          className={cn(
-            "min-h-10 rounded-full px-4 py-2 text-center text-sm font-bold",
-            activeTab === "details"
-              ? "bg-white text-[#156240] shadow-sm"
-              : "text-[#66736A]",
-          )}
-          href={withLocale(locale, `/lobby/${activityId}/aa`)}
-        >
-          {copy.detailTab}
-        </Link>
-        <Link
-          className={cn(
-            "relative min-h-10 rounded-full px-4 py-2 text-center text-sm font-bold",
-            activeTab === "settlement"
-              ? "bg-white text-[#156240] shadow-sm"
-              : "text-[#66736A]",
-          )}
-          href={withLocale(locale, `/lobby/${activityId}/aa?tab=settlement`)}
-        >
-          {copy.settlementTab}
-          {snapshot.summary.actionCount > 0 ? (
-            <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#E7457A] px-1 text-[9px] text-white">
-              {snapshot.summary.actionCount > 9
-                ? "9+"
-                : snapshot.summary.actionCount}
-            </span>
-          ) : null}
-        </Link>
-      </nav>
-
-      {activeTab === "details" ? (
-        <>
-          <details className="group rounded-[1.2rem] border border-[#E3DFD0] bg-white p-4">
-            <summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 text-sm font-bold text-[#156240] [&::-webkit-details-marker]:hidden">
-              <BarChart3 className="h-4 w-4" />
-              {ui.statistics}
-              <ChevronRight className="ml-auto h-4 w-4 transition group-open:rotate-90" />
-            </summary>
-            <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[#EEEBDD] pt-4 sm:grid-cols-3">
-              <div className="rounded-2xl bg-[#F5F8F2] p-3">
-                <p className="text-[10px] font-bold text-[#7C827A]">
-                  {ui.income}
-                </p>
-                <p className="mt-1 text-sm font-black tabular-nums text-ink">
-                  {formatMinorAmount(
-                    BigInt(snapshot.summary.incomeTotalMinor),
-                    snapshot.baseCurrency,
-                    locale,
-                  )}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-[#F5F8F2] p-3">
-                <p className="text-[10px] font-bold text-[#7C827A]">
-                  {ui.transfers}
-                </p>
-                <p className="mt-1 text-sm font-black tabular-nums text-ink">
-                  {formatMinorAmount(
-                    BigInt(snapshot.summary.transferTotalMinor),
-                    snapshot.baseCurrency,
-                    locale,
-                  )}
-                </p>
-              </div>
-              {snapshot.statistics.categories.map((category) => (
-                <div
-                  className="rounded-2xl bg-[#F5F8F2] p-3"
-                  key={category.name}
-                >
-                  <p className="truncate text-[10px] font-bold text-[#7C827A]">
-                    {category.name}
-                  </p>
-                  <p className="mt-1 text-sm font-black tabular-nums text-ink">
-                    {formatMinorAmount(
-                      BigInt(category.amountMinor),
-                      snapshot.baseCurrency,
-                      locale,
-                    )}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </details>
-
-          <details
-            className="group rounded-[1.2rem] border border-[#E3DFD0] bg-white p-4"
-            open={hasFilters}
-          >
-            <summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 text-sm font-bold text-[#156240] [&::-webkit-details-marker]:hidden">
-              <Filter className="h-4 w-4" />
-              {ui.filter}
-              {hasFilters ? (
-                <span className="rounded-full bg-[#E7457A] px-2 py-0.5 text-[10px] text-white">
-                  {filteredTransactions.length}
-                </span>
-              ) : null}
-              <ChevronRight className="ml-auto h-4 w-4 transition group-open:rotate-90" />
-            </summary>
-            <form
-              className="mt-4 grid gap-2 border-t border-[#EEEBDD] pt-4 sm:grid-cols-2"
-              method="get"
+      <section>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-[12px] font-black text-[#1D1D1B]">
+            {ui.spendList}
+          </h2>
+          {snapshot.status === "ACTIVE" ? (
+            <Link
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-[#F1F6ED] px-3 text-[10px] font-bold text-[#156240]"
+              href={newHref}
             >
-              <input
-                className="h-11 rounded-xl border border-[#D6D5B2] px-3 text-sm font-semibold outline-none focus:border-[#369758] sm:col-span-2"
-                defaultValue={filters.q}
-                name="q"
-                placeholder={ui.search}
-              />
-              <select
-                aria-label="Type"
-                className="h-11 rounded-xl border border-[#D6D5B2] bg-white px-3 text-sm font-semibold outline-none"
-                defaultValue={filters.type}
-                name="type"
-              >
-                <option value="">{ui.all}</option>
-                <option value="EXPENSE">{copy.expense}</option>
-                <option value="INCOME">{copy.income}</option>
-                <option value="TRANSFER">{copy.transfer}</option>
-              </select>
-              <select
-                aria-label="Status"
-                className="h-11 rounded-xl border border-[#D6D5B2] bg-white px-3 text-sm font-semibold outline-none"
-                defaultValue={filters.status}
-                name="status"
-              >
-                <option value="">{ui.all}</option>
-                {[
-                  "POSTED",
-                  "PENDING_REVIEW",
-                  "PENDING_CONFIRMATION",
-                  "DISPUTED",
-                  "REJECTED",
-                  "VOIDED",
-                ].map((status) => (
-                  <option key={status} value={status}>
-                    {getAaStatusLabel(locale, status)}
-                  </option>
-                ))}
-              </select>
-              <select
-                aria-label={ui.category}
-                className="h-11 rounded-xl border border-[#D6D5B2] bg-white px-3 text-sm font-semibold outline-none"
-                defaultValue={filters.category}
-                name="category"
-              >
-                <option value="">{ui.category} · {ui.all}</option>
-                {snapshot.categories.map((category) => (
-                  <option key={category.id} value={category.name}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                aria-label={ui.member}
-                className="h-11 rounded-xl border border-[#D6D5B2] bg-white px-3 text-sm font-semibold outline-none"
-                defaultValue={filters.member}
-                name="member"
-              >
-                <option value="">{ui.member} · {ui.all}</option>
-                {snapshot.participants.map((participant) => (
-                  <option key={participant.id} value={participant.id}>
-                    {participant.displayName}
-                  </option>
-                ))}
-              </select>
-              <label className="grid gap-1 text-[10px] font-bold text-[#7C827A]">
-                {ui.from}
-                <input
-                  className="h-11 rounded-xl border border-[#D6D5B2] px-3 text-sm font-semibold text-ink outline-none"
-                  defaultValue={filters.from}
-                  name="from"
-                  type="date"
-                />
-              </label>
-              <label className="grid gap-1 text-[10px] font-bold text-[#7C827A]">
-                {ui.to}
-                <input
-                  className="h-11 rounded-xl border border-[#D6D5B2] px-3 text-sm font-semibold text-ink outline-none"
-                  defaultValue={filters.to}
-                  name="to"
-                  type="date"
-                />
-              </label>
-              <div className="grid grid-cols-2 gap-2 sm:col-span-2">
-                <Link
-                  className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#D6D5B2] text-xs font-bold text-[#66736A]"
-                  href={withLocale(locale, `/lobby/${activityId}/aa`)}
-                >
-                  {ui.reset}
-                </Link>
-                <button
-                  className="min-h-10 rounded-full bg-[#156240] text-xs font-bold text-white"
-                  type="submit"
-                >
-                  {ui.filter}
-                </button>
-              </div>
-            </form>
-            {hasFilters ? (
-              <p className="mt-3 rounded-xl bg-[#FFF8E9] px-3 py-2 text-[11px] font-bold text-[#725C28]">
-                {ui.filter}: {filteredTransactions.length} · {copy.totalExpense}{" "}
-                {formatMinorAmount(
-                  filteredExpenseMinor,
-                  snapshot.baseCurrency,
-                  locale,
-                )}
-              </p>
-            ) : null}
-          </details>
-        </>
-      ) : null}
+              <Plus className="h-3.5 w-3.5" />
+              {ui.upload}
+            </Link>
+          ) : null}
+        </div>
 
-      {activeTab === "details" ? (
-        filteredTransactions.length > 0 ? (
-          <section className="grid gap-2.5">
+        {filteredTransactions.length > 0 ? (
+          <div className="mt-3 overflow-hidden rounded-[16px] border border-[#E7E1CE] bg-white px-4">
             {visibleTransactions.map((transaction) => (
               <TransactionRow
                 activityId={activityId}
@@ -730,313 +517,273 @@ export default async function AaLedgerPage({
                 transaction={transaction}
               />
             ))}
-            {pageCount > 1 ? (
-              <nav
-                aria-label="Pagination"
-                className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2"
-              >
-                {currentPage > 1 ? (
-                  <Link
-                    className="min-h-10 rounded-full border border-[#D6D5B2] px-4 py-2 text-center text-xs font-bold text-[#156240]"
-                    href={pageHref(currentPage - 1)}
-                  >
-                    ←
-                  </Link>
-                ) : (
-                  <span />
-                )}
-                <span className="text-xs font-bold text-[#7C827A]">
-                  {currentPage} / {pageCount}
-                </span>
-                {currentPage < pageCount ? (
-                  <Link
-                    className="min-h-10 rounded-full border border-[#D6D5B2] px-4 py-2 text-center text-xs font-bold text-[#156240]"
-                    href={pageHref(currentPage + 1)}
-                  >
-                    →
-                  </Link>
-                ) : (
-                  <span />
-                )}
-              </nav>
-            ) : null}
-          </section>
+          </div>
         ) : (
-          <section className="rounded-[1.4rem] border border-dashed border-[#C7DCCB] bg-white px-6 py-12 text-center">
-            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#ECF5EF] text-[#156240]">
-              <ReceiptText className="h-5 w-5" />
-            </span>
-            <h2 className="mt-4 text-base font-black text-ink">
+          <div className="mt-3 rounded-[16px] border border-dashed border-[#C7DCCB] bg-white px-6 py-8 text-center">
+            <Camera
+              className="mx-auto h-6 w-6 text-[#369758]"
+              strokeWidth={1.7}
+            />
+            <h3 className="mt-3 text-[13px] font-black text-[#1D1D1B]">
               {hasFilters ? ui.filteredEmpty : copy.emptyTitle}
-            </h2>
-            <p className="mx-auto mt-2 max-w-md text-sm font-semibold leading-6 text-[#727970]">
+            </h3>
+            <p className="mt-1.5 text-[11px] font-semibold leading-5 text-[#7C827A]">
               {hasFilters ? ui.search : copy.emptyBody}
             </p>
-            {snapshot.status === "ACTIVE" && !hasFilters ? (
+          </div>
+        )}
+
+        {pageCount > 1 ? (
+          <nav className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            {currentPage > 1 ? (
               <Link
-                className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-full bg-[#156240] px-5 text-sm font-bold text-white"
-                href={newHref}
+                className="min-h-9 rounded-full border border-[#D6D5B2] py-2 text-center text-xs font-bold text-[#156240]"
+                href={pageHref(currentPage - 1)}
               >
-                <Plus className="h-4 w-4" />
-                {copy.add}
+                ←
               </Link>
-            ) : null}
-          </section>
-        )
-      ) : snapshot.settlements.length > 0 ? (
-        <section className="grid gap-3 md:grid-cols-2">
-          {snapshot.summary.settlementBlocked ? (
-            <p className="rounded-2xl border border-[#E8D9B4] bg-[#FFF8E9] px-4 py-3 text-xs font-bold leading-5 text-[#725C28] md:col-span-2">
-              {copy.settlementBlocked}
-            </p>
-          ) : null}
-          {snapshot.settlements.map((settlement) => (
-            <article
-              className={cn(
-                "rounded-[1.3rem] border bg-white p-4",
-                settlement.involvesViewer
-                  ? "border-[#8AB68E] shadow-sm"
-                  : "border-[#E3DFD0]",
-              )}
-              key={`${settlement.fromParticipantId}:${settlement.toParticipantId}`}
-            >
-              <div className="flex items-center gap-3">
-                <span className="flex h-9 min-w-9 items-center justify-center rounded-full bg-[#FFF1EC] px-2 text-xs font-black text-[#B75D50]">
-                  {Array.from(settlement.fromName)[0]}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold text-ink">
-                    {settlement.fromName}
-                  </p>
-                  <div className="my-1 flex items-center gap-2 text-[10px] font-bold text-[#8B907F]">
-                    <span className="h-px flex-1 bg-[#DCE3D9]" />
-                    <ArrowRight className="h-3.5 w-3.5" />
-                    <span className="h-px flex-1 bg-[#DCE3D9]" />
-                  </div>
-                  <p className="truncate text-sm font-bold text-ink">
-                    {settlement.toName}
-                  </p>
-                </div>
-                <span className="text-right text-base font-black tabular-nums text-[#156240]">
-                  {formatMinorAmount(
-                    BigInt(settlement.amountMinor),
-                    snapshot.baseCurrency,
-                    locale,
-                  )}
-                </span>
-              </div>
-              <p className="mt-3 text-[11px] font-semibold leading-5 text-[#7C827A]">
-                {copy.why}
-              </p>
-              {!snapshot.summary.settlementBlocked &&
-              (settlement.fromParticipantId === snapshot.viewer.id ||
-                snapshot.canManage) &&
-              snapshot.status === "ACTIVE" ? (
-                <Link
-                  className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-full border border-[#8AB68E] text-xs font-bold text-[#156240]"
-                  href={`${newHref}?type=TRANSFER&from=${encodeURIComponent(settlement.fromParticipantId)}&to=${encodeURIComponent(settlement.toParticipantId)}&amount=${Number(BigInt(settlement.amountMinor)) / 100}`}
-                >
-                  <CircleDollarSign className="h-3.5 w-3.5" />
-                  {copy.recordPayment}
-                </Link>
-              ) : null}
-              {!snapshot.summary.settlementBlocked &&
-              (settlement.toParticipantId === snapshot.viewer.id ||
-                snapshot.canManage) &&
-              snapshot.status === "ACTIVE" ? (
-                <form action={createAaPaymentRequestAction} className="mt-2">
-                  <input name="activityId" type="hidden" value={activityId} />
-                  <input
-                    name="amountMinor"
-                    type="hidden"
-                    value={settlement.amountMinor}
-                  />
-                  <input
-                    name="fromParticipantId"
-                    type="hidden"
-                    value={settlement.fromParticipantId}
-                  />
-                  <input
-                    name="ledgerVersion"
-                    type="hidden"
-                    value={snapshot.version}
-                  />
-                  <input name="locale" type="hidden" value={locale} />
-                  <input
-                    name="toParticipantId"
-                    type="hidden"
-                    value={settlement.toParticipantId}
-                  />
-                  <button
-                    className="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-full bg-[#ECF5EF] text-xs font-bold text-[#156240]"
-                    type="submit"
-                  >
-                    <WalletCards className="h-3.5 w-3.5" />
-                    {ui.request}
-                  </button>
-                </form>
-              ) : null}
-            </article>
-          ))}
-        </section>
-      ) : (
-        <section className="rounded-[1.4rem] border border-[#D8E8DC] bg-white px-6 py-12 text-center">
-          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#ECF5EF] text-[#156240]">
-            <WalletCards className="h-5 w-5" />
+            ) : (
+              <span />
+            )}
+            <span className="text-[10px] font-bold text-[#8E8383]">
+              {currentPage} / {pageCount}
+            </span>
+            {currentPage < pageCount ? (
+              <Link
+                className="min-h-9 rounded-full border border-[#D6D5B2] py-2 text-center text-xs font-bold text-[#156240]"
+                href={pageHref(currentPage + 1)}
+              >
+                →
+              </Link>
+            ) : (
+              <span />
+            )}
+          </nav>
+        ) : null}
+
+        <div className="mt-3 flex items-center justify-between px-1 text-[11px] font-bold text-[#68736B]">
+          <span>
+            {locale === "fr"
+              ? "Total"
+              : locale === "en"
+                ? "Total"
+                : "总开支（预计）"}
           </span>
-          <h2 className="mt-4 text-base font-black text-ink">
-            {copy.noSettlement}
-          </h2>
-          <p className="mt-2 text-sm font-semibold text-[#727970]">
-            {copy.noSettlementBody}
-          </p>
-        </section>
-      )}
+          <strong className="text-[14px] font-black text-[#1D1D1B] friemi-tabular">
+            {formatMinorAmount(
+              BigInt(snapshot.summary.expenseTotalMinor),
+              snapshot.baseCurrency,
+              locale,
+            )}
+          </strong>
+        </div>
+      </section>
+
+      <Link
+        className="flex min-h-12 items-center justify-center gap-2 rounded-[12px] bg-gradient-to-r from-[#156240] to-[#369758] px-4 text-[13px] font-bold text-white shadow-[0_10px_24px_rgba(21,98,64,0.16)]"
+        href={progressHref}
+      >
+        <UsersRound className="h-4 w-4" />
+        {ui.progress}
+        <ArrowRight className="h-4 w-4" />
+      </Link>
+
+      <details
+        className="group rounded-[16px] border border-[#E7E1CE] bg-white px-4 py-3"
+        open={hasFilters}
+      >
+        <summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 text-[11px] font-bold text-[#156240] [&::-webkit-details-marker]:hidden">
+          <Filter className="h-3.5 w-3.5" />
+          {ui.filter}
+          <ChevronRight className="ml-auto h-3.5 w-3.5 transition group-open:rotate-90" />
+        </summary>
+        <form
+          className="mt-3 grid gap-2 border-t border-[#EEEBDD] pt-3"
+          method="get"
+        >
+          <input
+            className="h-10 rounded-[12px] border border-[#D6D5B2] px-3 text-[11px] font-semibold outline-none focus:border-[#369758]"
+            defaultValue={filters.q}
+            name="q"
+            placeholder={ui.search}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              className="h-10 rounded-[12px] border border-[#D6D5B2] bg-white px-2 text-[11px] font-semibold"
+              defaultValue={filters.type}
+              name="type"
+            >
+              <option value="">{ui.all}</option>
+              <option value="EXPENSE">{copy.expense}</option>
+              <option value="INCOME">{copy.income}</option>
+              <option value="TRANSFER">{copy.transfer}</option>
+            </select>
+            <select
+              className="h-10 rounded-[12px] border border-[#D6D5B2] bg-white px-2 text-[11px] font-semibold"
+              defaultValue={filters.status}
+              name="status"
+            >
+              <option value="">{ui.all}</option>
+              {[
+                "POSTED",
+                "PENDING_REVIEW",
+                "PENDING_CONFIRMATION",
+                "DISPUTED",
+                "REJECTED",
+                "VOIDED",
+              ].map((status) => (
+                <option key={status} value={status}>
+                  {getAaStatusLabel(locale, status)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Link
+              className="flex min-h-10 items-center justify-center rounded-full border border-[#D6D5B2] text-[10px] font-bold text-[#68736B]"
+              href={withLocale(locale, `/lobby/${activityId}/aa`)}
+            >
+              {ui.reset}
+            </Link>
+            <button
+              className="min-h-10 rounded-full bg-[#369758] text-[10px] font-bold text-white"
+              type="submit"
+            >
+              {ui.filter}
+            </button>
+          </div>
+        </form>
+      </details>
 
       {snapshot.canManage ? (
-        <details className="group rounded-[1.2rem] border border-[#E3DFD0] bg-white p-4">
-          <summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 text-sm font-bold text-[#156240] [&::-webkit-details-marker]:hidden">
-            <Settings2 className="h-4 w-4" />
+        <details
+          className="group rounded-[16px] border border-[#E7E1CE] bg-white px-4 py-3"
+          id="aa-ledger-settings"
+        >
+          <summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 text-[11px] font-bold text-[#156240] [&::-webkit-details-marker]:hidden">
+            <Settings2 className="h-3.5 w-3.5" />
             {copy.settings}
-            <ChevronRight className="ml-auto h-4 w-4 transition group-open:rotate-90" />
+            <ChevronRight className="ml-auto h-3.5 w-3.5 transition group-open:rotate-90" />
           </summary>
-          <div className="mt-4 grid gap-4 border-t border-[#EEEBDD] pt-4 md:grid-cols-2">
+          <div className="mt-3 space-y-4 border-t border-[#EEEBDD] pt-4">
             <form
               action={updateAaLedgerRulesAction}
-              className="grid gap-3 rounded-2xl bg-[#F8FAF5] p-3"
+              className="grid gap-3 rounded-[12px] bg-[#F7F9F4] p-3"
             >
               <input name="activityId" type="hidden" value={activityId} />
               <input name="locale" type="hidden" value={locale} />
-              <p className="text-xs font-black text-ink">
-                {locale === "fr"
-                  ? "Règles du compte"
-                  : locale === "en"
-                    ? "Ledger rules"
-                    : "核算规则"}
-              </p>
-              <label className="flex min-h-10 items-center gap-3 text-xs font-bold text-[#5F675F]">
-                <input
-                  className="h-4 w-4 accent-[#156240]"
-                  defaultChecked={snapshot.requireMemberReview}
-                  name="requireMemberReview"
-                  type="checkbox"
-                  value="true"
-                />
-                {locale === "fr"
-                  ? "Valider les saisies des membres"
-                  : locale === "en"
-                    ? "Review member entries"
-                    : "参与者提交后需要审核"}
-              </label>
-              <label className="flex min-h-10 items-center gap-3 text-xs font-bold text-[#5F675F]">
-                <input
-                  className="h-4 w-4 accent-[#156240]"
-                  defaultChecked={snapshot.allowMemberCorrections}
-                  name="allowMemberCorrections"
-                  type="checkbox"
-                  value="true"
-                />
-                {locale === "fr"
-                  ? "Autoriser les membres à proposer des corrections"
-                  : locale === "en"
-                    ? "Let members propose corrections"
-                    : "允许参与者发起共同纠错"}
-              </label>
-              <label className="flex min-h-10 items-center gap-3 text-xs font-bold text-[#5F675F]">
-                <input
-                  className="h-4 w-4 accent-[#156240]"
-                  defaultChecked={snapshot.requireTransferConfirmation}
-                  name="requireTransferConfirmation"
-                  type="checkbox"
-                  value="true"
-                />
-                {locale === "fr"
-                  ? "Confirmation des deux côtés"
-                  : locale === "en"
-                    ? "Require two-sided payment confirmation"
-                    : "转账需要双方确认"}
-              </label>
+              {[
+                [
+                  "requireMemberReview",
+                  snapshot.requireMemberReview,
+                  locale === "fr"
+                    ? "Valider les saisies"
+                    : locale === "en"
+                      ? "Review member entries"
+                      : "参与者提交后需要审核",
+                ],
+                [
+                  "allowMemberCorrections",
+                  snapshot.allowMemberCorrections,
+                  locale === "fr"
+                    ? "Corrections des membres"
+                    : locale === "en"
+                      ? "Allow member corrections"
+                      : "允许参与者发起共同纠错",
+                ],
+                [
+                  "requireTransferConfirmation",
+                  snapshot.requireTransferConfirmation,
+                  locale === "fr"
+                    ? "Confirmation des paiements"
+                    : locale === "en"
+                      ? "Confirm payments on both sides"
+                      : "转账需要双方确认",
+                ],
+              ].map(([name, checked, label]) => (
+                <label
+                  className="flex min-h-9 items-center gap-3 text-[10px] font-bold text-[#68736B]"
+                  key={String(name)}
+                >
+                  <input
+                    className="h-4 w-4 accent-[#369758]"
+                    defaultChecked={Boolean(checked)}
+                    name={String(name)}
+                    type="checkbox"
+                    value="true"
+                  />
+                  {String(label)}
+                </label>
+              ))}
               <div className="grid grid-cols-2 gap-2">
-                <label className="grid gap-1 text-[10px] font-bold text-[#7C827A]">
-                  {locale === "fr"
-                    ? "Devise"
-                    : locale === "en"
-                      ? "Currency"
-                      : "账本币种"}
-                  {snapshot.summary.postedCount > 0 ? (
-                    <input
-                      name="baseCurrency"
-                      type="hidden"
-                      value={snapshot.baseCurrency}
-                    />
-                  ) : null}
-                  <select
-                    className="h-10 rounded-xl border border-[#D6D5B2] bg-white px-2 text-xs font-bold text-ink disabled:bg-[#EEF1F1]"
-                    defaultValue={snapshot.baseCurrency}
-                    disabled={snapshot.summary.postedCount > 0}
-                    name={
-                      snapshot.summary.postedCount > 0
-                        ? undefined
-                        : "baseCurrency"
-                    }
-                  >
-                    {["EUR", "CNY", "USD", "GBP"].map((currency) => (
-                      <option key={currency} value={currency}>
-                        {currency}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-1 text-[10px] font-bold text-[#7C827A]">
-                  {locale === "fr"
-                    ? "Fuseau"
-                    : locale === "en"
-                      ? "Timezone"
-                      : "账本时区"}
-                  <select
-                    className="h-10 rounded-xl border border-[#D6D5B2] bg-white px-2 text-xs font-bold text-ink"
-                    defaultValue={snapshot.timezone}
-                    name="timezone"
-                  >
-                    <option value="Europe/Paris">Europe/Paris</option>
-                    <option value="Europe/Bratislava">Europe/Bratislava</option>
-                    <option value="Asia/Shanghai">Asia/Shanghai</option>
-                    <option value="UTC">UTC</option>
-                  </select>
-                </label>
+                {snapshot.summary.postedCount > 0 ? (
+                  <input
+                    name="baseCurrency"
+                    type="hidden"
+                    value={snapshot.baseCurrency}
+                  />
+                ) : null}
+                <select
+                  className="h-10 rounded-[12px] border border-[#D6D5B2] bg-white px-2 text-[10px] font-bold"
+                  defaultValue={snapshot.baseCurrency}
+                  disabled={snapshot.summary.postedCount > 0}
+                  name={
+                    snapshot.summary.postedCount > 0
+                      ? undefined
+                      : "baseCurrency"
+                  }
+                >
+                  {["EUR", "CNY", "USD", "GBP"].map((currency) => (
+                    <option key={currency}>{currency}</option>
+                  ))}
+                </select>
+                <select
+                  className="h-10 rounded-[12px] border border-[#D6D5B2] bg-white px-2 text-[10px] font-bold"
+                  defaultValue={snapshot.timezone}
+                  name="timezone"
+                >
+                  <option value="Europe/Paris">Europe/Paris</option>
+                  <option value="Europe/Bratislava">Europe/Bratislava</option>
+                  <option value="Asia/Shanghai">Asia/Shanghai</option>
+                  <option value="UTC">UTC</option>
+                </select>
               </div>
               <button
-                className="min-h-10 rounded-full bg-[#156240] text-xs font-bold text-white"
+                className="min-h-10 rounded-full bg-[#369758] text-[10px] font-bold text-white"
                 type="submit"
               >
                 {locale === "fr"
-                  ? "Enregistrer les règles"
+                  ? "Enregistrer"
                   : locale === "en"
                     ? "Save rules"
                     : "保存核算规则"}
               </button>
             </form>
 
-            <div className="grid gap-3 rounded-2xl bg-[#F8FAF5] p-3">
-              <p className="text-xs font-black text-ink">
+            <div className="rounded-[12px] bg-[#F7F9F4] p-3">
+              <p className="text-[10px] font-black text-[#1D1D1B]">
                 {locale === "fr"
                   ? "Catégories"
                   : locale === "en"
                     ? "Categories"
                     : "费用分类"}
               </p>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="mt-2 flex flex-wrap gap-1.5">
                 {snapshot.categorySettings.map((category) => (
                   <form action={toggleAaCategoryAction} key={category.id}>
                     <input name="activityId" type="hidden" value={activityId} />
-                    <input name="categoryId" type="hidden" value={category.id} />
+                    <input
+                      name="categoryId"
+                      type="hidden"
+                      value={category.id}
+                    />
                     <input name="locale" type="hidden" value={locale} />
                     <button
                       className={cn(
-                        "min-h-8 rounded-full px-3 text-[11px] font-bold",
+                        "min-h-8 rounded-full px-3 text-[9px] font-bold",
                         category.isActive
                           ? "bg-[#ECF5EF] text-[#156240]"
-                          : "bg-[#EEF1F1] text-[#8A9188] line-through",
+                          : "bg-[#EEEFEA] text-[#9A9C95] line-through",
                       )}
                       type="submit"
                     >
@@ -1045,11 +792,11 @@ export default async function AaLedgerPage({
                   </form>
                 ))}
               </div>
-              <form action={createAaCategoryAction} className="flex gap-2">
+              <form action={createAaCategoryAction} className="mt-2 flex gap-2">
                 <input name="activityId" type="hidden" value={activityId} />
                 <input name="locale" type="hidden" value={locale} />
                 <input
-                  className="h-10 min-w-0 flex-1 rounded-xl border border-[#D6D5B2] bg-white px-3 text-xs font-semibold outline-none focus:border-[#369758]"
+                  className="h-9 min-w-0 flex-1 rounded-[10px] border border-[#D6D5B2] bg-white px-3 text-[10px]"
                   maxLength={60}
                   name="name"
                   placeholder={
@@ -1062,108 +809,99 @@ export default async function AaLedgerPage({
                   required
                 />
                 <button
-                  className="min-h-10 shrink-0 rounded-full border border-[#8AB68E] px-4 text-xs font-bold text-[#156240]"
+                  className="min-h-9 rounded-full border border-[#8AB68E] px-3 text-[10px] font-bold text-[#156240]"
                   type="submit"
                 >
-                  {locale === "fr" ? "Ajouter" : locale === "en" ? "Add" : "添加"}
+                  ＋
                 </button>
               </form>
             </div>
-          </div>
-          <div className="mt-4 grid gap-2 border-t border-[#EEEBDD] pt-4 sm:grid-cols-3">
-            <a
-              className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-[#D6D5B2] text-xs font-bold text-[#156240]"
-              href={`/api/aa/${encodeURIComponent(activityId)}/export?locale=${encodeURIComponent(locale)}`}
-            >
-              <Download className="h-3.5 w-3.5" />
-              {copy.exportCsv}
-            </a>
-            <a
-              className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-[#D6D5B2] text-xs font-bold text-[#156240]"
-              href={`/api/aa/${encodeURIComponent(activityId)}/export?locale=${encodeURIComponent(locale)}&kind=settlement`}
-            >
-              <Download className="h-3.5 w-3.5" />
-              {locale === "fr"
-                ? "Exporter le règlement"
-                : locale === "en"
-                  ? "Export settlement"
-                  : "导出结算摘要"}
-            </a>
-            <AaLedgerShareTools locale={locale} title={snapshot.title} />
-            {snapshot.status === "ACTIVE" ? (
-              <form action={updateAaLedgerStatusAction}>
-                <input name="activityId" type="hidden" value={activityId} />
-                <input name="locale" type="hidden" value={locale} />
-                <input name="intent" type="hidden" value="freeze" />
-                <button
-                  className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-[#D6D5B2] text-xs font-bold text-[#607268]"
-                  type="submit"
-                >
-                  <Snowflake className="h-3.5 w-3.5" />
-                  {copy.freeze}
-                </button>
-              </form>
-            ) : (
-              <form action={updateAaLedgerStatusAction}>
-                <input name="activityId" type="hidden" value={activityId} />
-                <input name="locale" type="hidden" value={locale} />
-                <input name="intent" type="hidden" value="reopen" />
-                <button
-                  className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-[#8AB68E] text-xs font-bold text-[#156240]"
-                  type="submit"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  {copy.reopen}
-                </button>
-              </form>
-            )}
-            {snapshot.status !== "ARCHIVED" ? (
-              <form action={updateAaLedgerStatusAction}>
-                <input name="activityId" type="hidden" value={activityId} />
-                <input name="locale" type="hidden" value={locale} />
-                <input name="intent" type="hidden" value="archive" />
-                <button
-                  className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-[#E7C4CB] text-xs font-bold text-[#A53C50]"
-                  type="submit"
-                >
-                  <Clock3 className="h-3.5 w-3.5" />
-                  {copy.archive}
-                </button>
-              </form>
-            ) : null}
-            <div className="rounded-2xl bg-[#F8FAF5] p-3 sm:col-span-3">
+
+            <div className="grid grid-cols-2 gap-2">
+              <a
+                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full border border-[#D6D5B2] text-[10px] font-bold text-[#156240]"
+                href={`/api/aa/${encodeURIComponent(activityId)}/export?locale=${encodeURIComponent(locale)}`}
+              >
+                <Download className="h-3.5 w-3.5" />
+                {copy.exportCsv}
+              </a>
+              <AaLedgerShareTools locale={locale} title={snapshot.title} />
+            </div>
+            <div className="rounded-[12px] bg-[#F7F9F4] p-3">
               <AaCsvImportForm activityId={activityId} locale={locale} />
             </div>
-          </div>
-          <details className="group/log mt-3 rounded-2xl bg-[#F8FAF5] p-3">
-            <summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 text-xs font-bold text-[#156240] [&::-webkit-details-marker]:hidden">
-              <ScrollText className="h-3.5 w-3.5" />
-              {ui.activityLog}
-              <span className="ml-auto text-[10px] text-[#7C827A]">
-                {snapshot.activityLog.length}
-              </span>
-            </summary>
-            <ol className="mt-2 grid max-h-80 gap-2 overflow-y-auto border-t border-[#E7EBDD] pt-3">
-              {snapshot.activityLog.map((event) => (
-                <li
-                  className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-xl bg-white px-3 py-2"
-                  key={event.id}
+
+            <div className="grid grid-cols-2 gap-2">
+              <form action={updateAaLedgerStatusAction}>
+                <input name="activityId" type="hidden" value={activityId} />
+                <input name="locale" type="hidden" value={locale} />
+                <input
+                  name="intent"
+                  type="hidden"
+                  value={snapshot.status === "ACTIVE" ? "freeze" : "reopen"}
+                />
+                <button
+                  className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-full border border-[#D6D5B2] text-[10px] font-bold text-[#68736B]"
+                  type="submit"
                 >
-                  <span className="truncate text-[11px] font-bold text-ink">
-                    {event.action} · {event.actorName ?? "SYSTEM"}
-                  </span>
-                  <time className="text-[10px] font-semibold text-[#8A9188]">
-                    {new Intl.DateTimeFormat(locale, {
-                      dateStyle: "short",
-                      timeStyle: "short",
-                    }).format(new Date(event.createdAt))}
-                  </time>
-                </li>
-              ))}
-            </ol>
-          </details>
+                  {snapshot.status === "ACTIVE" ? (
+                    <Snowflake className="h-3.5 w-3.5" />
+                  ) : (
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  )}
+                  {snapshot.status === "ACTIVE" ? copy.freeze : copy.reopen}
+                </button>
+              </form>
+              {snapshot.status !== "ARCHIVED" ? (
+                <form action={updateAaLedgerStatusAction}>
+                  <input name="activityId" type="hidden" value={activityId} />
+                  <input name="locale" type="hidden" value={locale} />
+                  <input name="intent" type="hidden" value="archive" />
+                  <button
+                    className="min-h-10 w-full rounded-full border border-[#E7C4CB] text-[10px] font-bold text-[#A53C50]"
+                    type="submit"
+                  >
+                    {copy.archive}
+                  </button>
+                </form>
+              ) : null}
+            </div>
+
+            <details className="group/log rounded-[12px] bg-[#F7F9F4] p-3">
+              <summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 text-[10px] font-bold text-[#156240] [&::-webkit-details-marker]:hidden">
+                <ScrollText className="h-3.5 w-3.5" />
+                {locale === "fr"
+                  ? "Journal"
+                  : locale === "en"
+                    ? "Activity log"
+                    : "活动记录"}
+                <span className="ml-auto">{snapshot.activityLog.length}</span>
+              </summary>
+              <ol className="mt-2 grid max-h-72 gap-2 overflow-y-auto border-t border-[#EEEBDD] pt-2">
+                {snapshot.activityLog.map((event) => (
+                  <li
+                    className="flex justify-between gap-2 rounded-[10px] bg-white px-3 py-2 text-[9px]"
+                    key={event.id}
+                  >
+                    <span className="truncate font-bold text-[#1D1D1B]">
+                      {event.action} · {event.actorName ?? "SYSTEM"}
+                    </span>
+                    <time className="shrink-0 text-[#8E8383]">
+                      {new Intl.DateTimeFormat(locale, {
+                        dateStyle: "short",
+                      }).format(new Date(event.createdAt))}
+                    </time>
+                  </li>
+                ))}
+              </ol>
+            </details>
+          </div>
         </details>
       ) : null}
+
+      <p className="text-center text-[9px] font-semibold leading-4 text-[#AAA79E]">
+        {copy.freeNotice}
+      </p>
     </PageContainer>
   );
 }

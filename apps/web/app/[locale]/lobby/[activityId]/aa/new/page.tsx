@@ -43,25 +43,34 @@ export default async function NewAaTransactionPage({
 
   return (
     <PageContainer
-      className="max-w-2xl space-y-5 bg-[#FBFCF7] py-4 sm:py-8"
+      className="max-w-[430px] space-y-5 bg-[#FEFFF9] pb-8 pt-4 sm:py-8"
       mobileSafeTop
       mobileSafeBottom
     >
       <MobileNavSectionOverride section="activities" />
-      <header className="flex items-center gap-3">
+      <header className="grid grid-cols-[44px_1fr_44px] items-center">
         <Link
           aria-label={copy.back}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#156240] ring-1 ring-[#D6D5B2]"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-[#1D1D1B] transition hover:bg-[#F1F2E3]"
           href={withLocale(locale, `/lobby/${activityId}/aa`)}
         >
-          <ArrowLeft className="h-4.5 w-4.5" />
+          <ArrowLeft className="h-[18px] w-[18px]" strokeWidth={1.8} />
         </Link>
-        <div className="min-w-0">
-          <h1 className="text-xl font-black text-ink">{copy.add}</h1>
+        <div className="min-w-0 text-center">
+          <h1 className="text-[17px] font-black text-[#1D1D1B]">
+            {initialType === "TRANSFER"
+              ? copy.transfer
+              : locale === "fr"
+                ? "Ajouter une dépense"
+                : locale === "en"
+                  ? "Upload expense"
+                  : "上传开支"}
+          </h1>
           <p className="truncate text-xs font-semibold text-[#7C827A]">
             {snapshot.title}
           </p>
         </div>
+        <span />
       </header>
 
       {!canRecord ? (
@@ -72,7 +81,7 @@ export default async function NewAaTransactionPage({
           </p>
         </section>
       ) : (
-        <section className="rounded-[1.5rem] border border-[#E3DFD0] bg-[#FEFFF9] p-4 shadow-sm sm:p-6">
+        <section>
           <AaTransactionForm
             activityId={activityId}
             baseCurrency={snapshot.baseCurrency}

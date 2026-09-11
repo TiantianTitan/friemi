@@ -1,22 +1,25 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import {
-  useActionState,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
+  ArrowLeft,
   ArrowRight,
+  BedDouble,
   Calculator,
   Camera,
+  CarFront,
+  Check,
+  ChevronRight,
   Cloud,
   CloudOff,
+  Images,
   Loader2,
   RefreshCw,
   ReceiptText,
+  ShoppingBag,
+  Ticket,
+  Utensils,
   UsersRound,
 } from "lucide-react";
 import {
@@ -85,8 +88,7 @@ function getCopy(locale: string) {
       calculate: "Utiliser le résultat",
       calculatorHint: "Ex. 12,50 + 8 × 2",
       multiPayer: "Avancé : plusieurs payeurs",
-      multiPayerHint:
-        "Le total payé doit être égal au montant de l'opération.",
+      multiPayerHint: "Le total payé doit être égal au montant de l'opération.",
       all: "Tout le monde",
       withoutMe: "Sans moi",
       onlyMe: "Moi uniquement",
@@ -103,6 +105,18 @@ function getCopy(locale: string) {
       fxLive: "Taux quotidien proposé par Frankfurter",
       fxCached: "Taux hors ligne de moins de 72 h",
       fxManual: "Taux automatique indisponible : saisissez un taux manuel.",
+      advanced: "Détails facultatifs",
+      backStep: "Revenir à la dépense",
+      confirmSplit: "Confirmer la répartition",
+      gallery: "Choisir dans la galerie",
+      next: "Continuer vers la répartition",
+      perPerson: "Part moyenne",
+      photo: "Photographier le reçu",
+      selected: "participants",
+      splitTitle: "Confirmer la répartition",
+      total: "Total réparti",
+      uploadHint: "Ajoutez un reçu ou saisissez la dépense à la main.",
+      uploadTitle: "Ajouter une dépense",
     };
   }
 
@@ -153,6 +167,18 @@ function getCopy(locale: string) {
       fxLive: "Daily rate suggested by Frankfurter",
       fxCached: "Offline rate cached within 72 hours",
       fxManual: "Automatic rate unavailable. Enter a manual rate.",
+      advanced: "Optional details",
+      backStep: "Back to expense",
+      confirmSplit: "Confirm split",
+      gallery: "Choose from gallery",
+      next: "Continue to split",
+      perPerson: "Average share",
+      photo: "Take receipt photo",
+      selected: "people included",
+      splitTitle: "Confirm split",
+      total: "Split total",
+      uploadHint: "Add a receipt or enter the expense manually.",
+      uploadTitle: "Upload expense",
     };
   }
 
@@ -200,7 +226,28 @@ function getCopy(locale: string) {
     fxLive: "Frankfurter 每日参考汇率",
     fxCached: "72 小时内的离线缓存汇率",
     fxManual: "自动汇率不可用，请手动输入。",
+    advanced: "选填详情",
+    backStep: "返回修改开支",
+    confirmSplit: "确认分摊",
+    gallery: "相册选择",
+    next: "下一步，确认分摊",
+    perPerson: "人均金额",
+    photo: "拍照上传",
+    selected: "人参与",
+    splitTitle: "确认分摊",
+    total: "分摊结果",
+    uploadHint: "拍照上传小票，或直接手动输入金额。",
+    uploadTitle: "上传开支",
   };
+}
+
+function categoryIcon(name: string) {
+  if (/餐|食|饭|酒|饮|dinner|food/i.test(name)) return Utensils;
+  if (/交通|车|taxi|transport/i.test(name)) return CarFront;
+  if (/住宿|酒店|hotel|stay/i.test(name)) return BedDouble;
+  if (/票|ticket/i.test(name)) return Ticket;
+  if (/购物|shop/i.test(name)) return ShoppingBag;
+  return ReceiptText;
 }
 
 const initialState: CreateAaTransactionState = {};
@@ -232,6 +279,7 @@ export function AaTransactionForm({
   const router = useRouter();
   const copy = getCopy(locale);
   const formRef = useRef<HTMLFormElement>(null);
+  const receiptInputRef = useRef<HTMLInputElement>(null);
   const activeParticipants = useMemo(
     () => participants.filter((participant) => participant.status === "ACTIVE"),
     [participants],
@@ -239,6 +287,9 @@ export function AaTransactionForm({
   const [type, setType] = useState(initialType);
   const [currency, setCurrency] = useState(baseCurrency);
   const [amount, setAmount] = useState(initialAmount ?? "");
+  const [categoryId, setCategoryId] = useState(categories[0]?.id ?? "");
+  const [receiptName, setReceiptName] = useState("");
+  const [step, setStep] = useState<"DETAILS" | "SPLIT">("DETAILS");
   const [calculatorExpression, setCalculatorExpression] = useState("");
   const [calculatorError, setCalculatorError] = useState(false);
   const [occurredOn, setOccurredOn] = useState(defaultDate);
@@ -463,10 +514,38 @@ export function AaTransactionForm({
     }
   };
 
+  const selectedParticipants = activeParticipants.filter((participant) =>
+    selectedShareIds.has(participant.id),
+  );
+  const parsedAmount = Number.parseFloat(amount.replace(",", "."));
+  const amountIsValid = Number.isFinite(parsedAmount) && parsedAmount > 0;
+  const equalShare =
+    amountIsValid && selectedParticipants.length > 0
+      ? parsedAmount / selectedParticipants.length
+      : 0;
+  const formatPreviewAmount = (value: number) =>
+    new Intl.NumberFormat(locale, {
+      currency,
+      currencyDisplay: "narrowSymbol",
+      style: "currency",
+    }).format(value);
+  const openReceiptPicker = (camera: boolean) => {
+    const input = receiptInputRef.current;
+    if (!input) return;
+    if (camera) input.setAttribute("capture", "environment");
+    else input.removeAttribute("capture");
+    input.click();
+  };
+  const continueToSplit = () => {
+    if (!formRef.current?.reportValidity()) return;
+    setStep("SPLIT");
+    window.scrollTo({ behavior: "smooth", top: 0 });
+  };
+
   return (
     <form
       action={formAction}
-      className="space-y-5"
+      className="space-y-4"
       onSubmitCapture={handleSubmitCapture}
       ref={formRef}
     >
@@ -474,13 +553,58 @@ export function AaTransactionForm({
       <input name="locale" type="hidden" value={locale} />
       <input name="clientMutationId" type="hidden" value={clientOperationId} />
       <input name="type" type="hidden" value={type} />
+      <input
+        accept="image/*,.heic,.heif"
+        className="sr-only"
+        name="receipt"
+        onChange={(event) =>
+          setReceiptName(event.target.files?.[0]?.name ?? "")
+        }
+        ref={receiptInputRef}
+        type="file"
+      />
       {type === "TRANSFER" ? (
         <input name="splitMode" type="hidden" value="EQUAL" />
       ) : null}
 
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p
+            className={cn(
+              "text-[15px] font-black text-[#1D1D1B]",
+              step === "DETAILS" && "sr-only",
+            )}
+          >
+            {step === "DETAILS" ? copy.uploadTitle : copy.splitTitle}
+          </p>
+          <p className="mt-1 text-[10px] font-semibold text-[#8E8383]">
+            {step === "DETAILS"
+              ? copy.uploadHint
+              : `${selectedParticipants.length} ${copy.selected}`}
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#369758] text-[9px] font-black text-white">
+            1
+          </span>
+          <span className="h-px w-5 bg-[#D6D5B2]" />
+          <span
+            className={cn(
+              "flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-black",
+              step === "SPLIT"
+                ? "bg-[#369758] text-white"
+                : "bg-[#F1F2E3] text-[#8E8383]",
+            )}
+          >
+            2
+          </span>
+        </div>
+      </div>
+
       <div
         className={cn(
-          "flex min-h-10 items-center gap-2 rounded-2xl px-3 text-xs font-bold",
+          "min-h-9 items-center gap-2 rounded-[12px] px-3 text-[10px] font-bold",
+          step === "DETAILS" ? "flex" : "hidden",
           syncState === "ONLINE"
             ? "bg-[#ECF5EF] text-[#156240]"
             : syncState === "FAILED"
@@ -512,18 +636,18 @@ export function AaTransactionForm({
 
       <div
         className={cn(
-          "grid gap-1 rounded-full bg-[#EEF3EC] p-1",
+          "gap-1 rounded-full bg-[#EEF3EC] p-1",
+          step === "DETAILS" ? "grid" : "hidden",
           transferOnly ? "grid-cols-1" : "grid-cols-3",
         )}
       >
-        {(
-          transferOnly
-            ? ([["TRANSFER", copy.transfer]] as const)
-            : ([
-                ["EXPENSE", copy.expense],
-                ["INCOME", copy.income],
-                ["TRANSFER", copy.transfer],
-              ] as const)
+        {(transferOnly
+          ? ([["TRANSFER", copy.transfer]] as const)
+          : ([
+              ["EXPENSE", copy.expense],
+              ["INCOME", copy.income],
+              ["TRANSFER", copy.transfer],
+            ] as const)
         ).map(([value, label]) => (
           <button
             className={cn(
@@ -541,18 +665,48 @@ export function AaTransactionForm({
         ))}
       </div>
 
-      <label className="block">
-        <span className="text-sm font-bold text-ink">{copy.title}</span>
-        <input
-          className="mt-2 h-12 w-full rounded-2xl border border-[#D6D5B2] bg-white px-4 text-base font-semibold text-ink outline-none transition focus:border-[#369758] focus:ring-2 focus:ring-[#369758]/15"
-          maxLength={120}
-          name="title"
-          placeholder={copy.titlePlaceholder}
-          required
-        />
-      </label>
+      {type !== "TRANSFER" ? (
+        <div
+          className={cn(
+            "grid grid-cols-2 gap-3",
+            step !== "DETAILS" && "hidden",
+          )}
+        >
+          <button
+            className="flex min-h-[112px] flex-col items-center justify-center gap-3 rounded-[14px] border border-[#E7E1CE] bg-white text-[#156240] transition hover:border-[#8AB68E] active:bg-[#F4F8F1]"
+            onClick={() => openReceiptPicker(true)}
+            type="button"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-[12px] bg-[#F2F7F0]">
+              <Camera className="h-5 w-5" strokeWidth={1.7} />
+            </span>
+            <span className="text-[11px] font-black">{copy.photo}</span>
+          </button>
+          <button
+            className="flex min-h-[112px] flex-col items-center justify-center gap-3 rounded-[14px] border border-[#E7E1CE] bg-white text-[#156240] transition hover:border-[#8AB68E] active:bg-[#F4F8F1]"
+            onClick={() => openReceiptPicker(false)}
+            type="button"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-[12px] bg-[#F2F7F0]">
+              <Images className="h-5 w-5" strokeWidth={1.7} />
+            </span>
+            <span className="text-[11px] font-black">{copy.gallery}</span>
+          </button>
+          {receiptName ? (
+            <p className="col-span-2 truncate rounded-[10px] bg-[#ECF5EF] px-3 py-2 text-[10px] font-bold text-[#156240]">
+              <Check className="mr-1.5 inline h-3.5 w-3.5" />
+              {receiptName}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
-      <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-2">
+      <div
+        className={cn(
+          "grid grid-cols-[minmax(0,1fr)_6.5rem] gap-2",
+          step !== "DETAILS" && "hidden",
+        )}
+      >
         <label className="block">
           <span className="text-sm font-bold text-ink">{copy.amount}</span>
           <input
@@ -587,7 +741,56 @@ export function AaTransactionForm({
         </label>
       </div>
 
-      <details className="group rounded-2xl border border-[#E3DFD0] bg-white px-4 py-3">
+      {type !== "TRANSFER" ? (
+        <fieldset className={cn(step !== "DETAILS" && "hidden")}>
+          <legend className="text-sm font-bold text-ink">
+            {copy.category}
+          </legend>
+          <input name="categoryId" type="hidden" value={categoryId} />
+          <div className="mt-2 grid grid-cols-4 gap-2">
+            {categories.slice(0, 8).map((category) => {
+              const Icon = categoryIcon(category.name);
+              const selected = category.id === categoryId;
+              return (
+                <button
+                  className={cn(
+                    "flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-[12px] border text-[9px] font-bold transition",
+                    selected
+                      ? "border-[#8AB68E] bg-[#EEF6EC] text-[#156240]"
+                      : "border-[#E7E1CE] bg-white text-[#68736B]",
+                  )}
+                  key={category.id}
+                  onClick={() => setCategoryId(category.id)}
+                  type="button"
+                >
+                  <Icon className="h-[17px] w-[17px]" strokeWidth={1.7} />
+                  <span className="max-w-full truncate px-1">
+                    {category.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+      ) : null}
+
+      <label className={cn("block", step !== "DETAILS" && "hidden")}>
+        <span className="text-sm font-bold text-ink">{copy.title}</span>
+        <input
+          className="mt-2 h-12 w-full rounded-2xl border border-[#D6D5B2] bg-white px-4 text-base font-semibold text-ink outline-none transition focus:border-[#369758] focus:ring-2 focus:ring-[#369758]/15"
+          maxLength={120}
+          name="title"
+          placeholder={copy.titlePlaceholder}
+          required
+        />
+      </label>
+
+      <details
+        className={cn(
+          "group rounded-[14px] border border-[#E7E1CE] bg-white px-4 py-3",
+          step !== "DETAILS" && "hidden",
+        )}
+      >
         <summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 text-sm font-bold text-[#156240] [&::-webkit-details-marker]:hidden">
           <Calculator className="h-4 w-4" />
           {copy.calculator}
@@ -624,7 +827,12 @@ export function AaTransactionForm({
       </details>
 
       {currency !== baseCurrency ? (
-        <label className="block rounded-2xl bg-[#FFF8E9] p-3 ring-1 ring-[#E8D9B4]">
+        <label
+          className={cn(
+            "block rounded-[14px] bg-[#FFF8E9] p-3 ring-1 ring-[#E8D9B4]",
+            step !== "DETAILS" && "hidden",
+          )}
+        >
           <span className="text-sm font-bold text-ink">{copy.rate}</span>
           <input
             className="mt-2 h-11 w-full rounded-xl border border-[#D6D5B2] bg-white px-3 text-base font-semibold tabular-nums outline-none focus:border-[#369758]"
@@ -667,7 +875,12 @@ export function AaTransactionForm({
       )}
 
       {type === "TRANSFER" ? (
-        <div className="rounded-[1.2rem] border border-[#E3DFD0] bg-white p-4">
+        <div
+          className={cn(
+            "rounded-[14px] border border-[#E7E1CE] bg-white p-4",
+            step !== "DETAILS" && "hidden",
+          )}
+        >
           <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-2">
             <label className="min-w-0">
               <span className="text-xs font-bold text-[#66736A]">
@@ -711,7 +924,12 @@ export function AaTransactionForm({
         </div>
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div
+            className={cn(
+              "grid gap-3 sm:grid-cols-2",
+              step !== "DETAILS" && "hidden",
+            )}
+          >
             <label className="block">
               <span className="text-sm font-bold text-ink">{copy.paidBy}</span>
               <select
@@ -726,24 +944,14 @@ export function AaTransactionForm({
                 ))}
               </select>
             </label>
-            <label className="block">
-              <span className="text-sm font-bold text-ink">
-                {copy.category}
-              </span>
-              <select
-                className="mt-2 h-12 w-full rounded-2xl border border-[#D6D5B2] bg-white px-3 text-sm font-semibold outline-none focus:border-[#369758]"
-                name="categoryId"
-              >
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </label>
           </div>
 
-          <details className="group rounded-[1.2rem] border border-[#E3DFD0] bg-white p-4">
+          <details
+            className={cn(
+              "group rounded-[14px] border border-[#E7E1CE] bg-white p-4",
+              step !== "DETAILS" && "hidden",
+            )}
+          >
             <summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 text-sm font-bold text-[#156240] [&::-webkit-details-marker]:hidden">
               <UsersRound className="h-4 w-4" />
               {copy.multiPayer}
@@ -782,7 +990,40 @@ export function AaTransactionForm({
             </div>
           </details>
 
-          <fieldset className="rounded-[1.2rem] border border-[#E3DFD0] bg-white p-4">
+          <div className={cn("space-y-3", step !== "SPLIT" && "hidden")}>
+            <div className="grid grid-cols-4 gap-1 rounded-full bg-[#EEF3EC] p-1">
+              {(
+                [
+                  ["EQUAL", copy.equal],
+                  ["WEIGHT", copy.weight],
+                  ["PERCENT", copy.percent],
+                  ["CUSTOM", copy.custom],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  className={cn(
+                    "min-h-9 rounded-full px-1 text-[9px] font-bold transition",
+                    splitMode === value
+                      ? "bg-white text-[#156240] shadow-sm"
+                      : "text-[#7A817A]",
+                  )}
+                  key={value}
+                  onClick={() => setSplitMode(value)}
+                  type="button"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <input name="splitMode" type="hidden" value={splitMode} />
+          </div>
+
+          <fieldset
+            className={cn(
+              "rounded-[14px] border border-[#E7E1CE] bg-white p-4",
+              step !== "SPLIT" && "hidden",
+            )}
+          >
             <legend className="px-1 text-sm font-bold text-ink">
               {copy.share}
             </legend>
@@ -861,17 +1102,26 @@ export function AaTransactionForm({
                       step={splitMode === "CUSTOM" ? "0.01" : "0.0001"}
                       type="number"
                     />
-                  ) : null}
+                  ) : (
+                    <span className="shrink-0 text-[12px] font-black text-[#1D1D1B] friemi-tabular">
+                      {selectedShareIds.has(participant.id)
+                        ? formatPreviewAmount(equalShare)
+                        : locale === "fr"
+                          ? "Exclu"
+                          : locale === "en"
+                            ? "Excluded"
+                            : "未参与"}
+                    </span>
+                  )}
                 </label>
               ))}
             </div>
           </fieldset>
 
-          <label className="block">
+          <label className="hidden">
             <span className="text-sm font-bold text-ink">{copy.splitMode}</span>
             <select
               className="mt-2 h-12 w-full rounded-2xl border border-[#D6D5B2] bg-white px-3 text-sm font-semibold outline-none focus:border-[#369758]"
-              name="splitMode"
               onChange={(event) =>
                 setSplitMode(event.target.value as typeof splitMode)
               }
@@ -886,7 +1136,12 @@ export function AaTransactionForm({
         </>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div
+        className={cn(
+          "grid gap-3 sm:grid-cols-2",
+          step !== "DETAILS" && "hidden",
+        )}
+      >
         <label className="block">
           <span className="text-sm font-bold text-ink">{copy.date}</span>
           <input
@@ -909,7 +1164,12 @@ export function AaTransactionForm({
       </div>
 
       {isFuture ? (
-        <label className="flex items-start gap-3 rounded-2xl bg-[#FFF8E9] px-4 py-3 text-xs font-semibold leading-5 text-[#725C28] ring-1 ring-[#E8D9B4]">
+        <label
+          className={cn(
+            "items-start gap-3 rounded-[14px] bg-[#FFF8E9] px-4 py-3 text-xs font-semibold leading-5 text-[#725C28] ring-1 ring-[#E8D9B4]",
+            step === "DETAILS" ? "flex" : "hidden",
+          )}
+        >
           <input
             className="mt-0.5 h-4 w-4 accent-[#156240]"
             name="futureConfirmed"
@@ -921,26 +1181,55 @@ export function AaTransactionForm({
         </label>
       ) : null}
 
-      <label className="block rounded-2xl border border-[#E3DFD0] bg-white p-4">
-        <span className="flex items-center gap-2 text-sm font-bold text-ink">
-          <Camera className="h-4 w-4 text-[#156240]" />
-          {copy.receipt}
-        </span>
-        <input
-          accept="image/*,.heic,.heif"
-          className="mt-3 block w-full text-xs font-semibold text-[#66736A] file:mr-3 file:min-h-9 file:rounded-full file:border-0 file:bg-[#ECF5EF] file:px-4 file:text-xs file:font-bold file:text-[#156240]"
-          name="receipt"
-          type="file"
-        />
-        <span className="mt-2 block text-[11px] font-semibold leading-5 text-[#7C827A]">
-          {copy.receiptHint}
-        </span>
-      </label>
-
       {!canManage && type !== "TRANSFER" ? (
-        <p className="rounded-2xl bg-[#FFF8E9] px-4 py-3 text-xs font-semibold leading-5 text-[#725C28] ring-1 ring-[#E8D9B4]">
+        <p
+          className={cn(
+            "rounded-[14px] bg-[#FFF8E9] px-4 py-3 text-xs font-semibold leading-5 text-[#725C28] ring-1 ring-[#E8D9B4]",
+            step !== "SPLIT" && "hidden",
+          )}
+        >
           {copy.review}
         </p>
+      ) : null}
+
+      {type !== "TRANSFER" ? (
+        <div
+          className={cn(
+            "rounded-[14px] border border-[#E7E1CE] bg-[#FEFFF9] p-4",
+            step !== "SPLIT" && "hidden",
+          )}
+        >
+          <div className="grid grid-cols-3 text-center">
+            <div>
+              <p className="text-[9px] font-bold text-[#8E8383]">
+                {copy.total}
+              </p>
+              <p className="mt-1 text-[13px] font-black text-[#1D1D1B] friemi-tabular">
+                {formatPreviewAmount(amountIsValid ? parsedAmount : 0)}
+              </p>
+            </div>
+            <div className="border-x border-[#EEEBDD] px-2">
+              <p className="text-[9px] font-bold text-[#8E8383]">
+                {locale === "fr"
+                  ? "Participants"
+                  : locale === "en"
+                    ? "People"
+                    : "参与人数"}
+              </p>
+              <p className="mt-1 text-[13px] font-black text-[#1D1D1B]">
+                {selectedParticipants.length}
+              </p>
+            </div>
+            <div>
+              <p className="text-[9px] font-bold text-[#8E8383]">
+                {copy.perPerson}
+              </p>
+              <p className="mt-1 truncate text-[13px] font-black text-[#1D1D1B] friemi-tabular">
+                {formatPreviewAmount(equalShare)}
+              </p>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {state.formError ? (
@@ -952,18 +1241,51 @@ export function AaTransactionForm({
         </p>
       ) : null}
 
-      <button
-        className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#156240] px-5 text-[15px] font-bold text-white shadow-[0_12px_28px_rgba(21,98,64,0.2)] transition hover:bg-[#287B55] active:scale-[0.98] disabled:opacity-60"
-        disabled={pending}
-        type="submit"
-      >
-        {pending ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <ReceiptText className="h-4 w-4" />
-        )}
-        {pending ? copy.saving : copy.save}
-      </button>
+      {type !== "TRANSFER" && step === "DETAILS" ? (
+        <button
+          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[12px] bg-gradient-to-r from-[#156240] to-[#369758] px-5 text-[13px] font-bold text-white shadow-[0_10px_24px_rgba(21,98,64,0.16)] transition active:scale-[0.99]"
+          onClick={continueToSplit}
+          type="button"
+        >
+          {copy.next}
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      ) : (
+        <div className="grid gap-2">
+          {type !== "TRANSFER" ? (
+            <button
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full text-[11px] font-bold text-[#156240]"
+              onClick={() => {
+                setStep("DETAILS");
+                window.scrollTo({ behavior: "smooth", top: 0 });
+              }}
+              type="button"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              {copy.backStep}
+            </button>
+          ) : null}
+          <button
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[12px] bg-gradient-to-r from-[#156240] to-[#369758] px-5 text-[13px] font-bold text-white shadow-[0_10px_24px_rgba(21,98,64,0.16)] transition active:scale-[0.99] disabled:opacity-60"
+            disabled={
+              pending ||
+              (type !== "TRANSFER" && selectedParticipants.length === 0)
+            }
+            type="submit"
+          >
+            {pending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Check className="h-4 w-4" />
+            )}
+            {pending
+              ? copy.saving
+              : type === "TRANSFER"
+                ? copy.save
+                : copy.confirmSplit}
+          </button>
+        </div>
+      )}
     </form>
   );
 }

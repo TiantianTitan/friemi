@@ -4,7 +4,15 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { Check, Copy, QrCode, Share2, X } from "lucide-react";
 
-export function AaLedgerShareTools({ locale, title }: { locale: string; title: string }) {
+export function AaLedgerShareTools({
+  locale,
+  title,
+  triggerLabel,
+}: {
+  locale: string;
+  title: string;
+  triggerLabel?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [url, setUrl] = useState("");
@@ -58,7 +66,7 @@ export function AaLedgerShareTools({ locale, title }: { locale: string; title: s
         type="button"
       >
         <Share2 className="h-3.5 w-3.5" />
-        {copy.share}
+        {triggerLabel ?? copy.share}
       </button>
       {open ? (
         <div
@@ -100,7 +108,11 @@ export function AaLedgerShareTools({ locale, title }: { locale: string; title: s
               onClick={copyUrl}
               type="button"
             >
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copied ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
               {copied ? copy.copied : copy.copy}
             </button>
           </section>

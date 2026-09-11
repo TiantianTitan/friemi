@@ -34,10 +34,7 @@ const defaultCategories = [
   ["其他", "receipt"],
 ] as const;
 
-function isActivityFinished(activity: {
-  status: string;
-  endAt: Date | null;
-}) {
+function isActivityFinished(activity: { status: string; endAt: Date | null }) {
   return (
     activity.status === "CANCELLED" ||
     activity.status === "ENDED" ||
@@ -585,14 +582,11 @@ export async function getActivityAaSnapshot(
       pendingChange: transaction.changeRequests[0]
         ? {
             id: transaction.changeRequests[0].id,
-            actorName:
-              transaction.changeRequests[0].actor.displayNameSnapshot,
-            createdAt:
-              transaction.changeRequests[0].createdAt.toISOString(),
+            actorName: transaction.changeRequests[0].actor.displayNameSnapshot,
+            createdAt: transaction.changeRequests[0].createdAt.toISOString(),
           }
         : null,
-      canReviewChange:
-        canManage && transaction.changeRequests.length > 0,
+      canReviewChange: canManage && transaction.changeRequests.length > 0,
       canReview: canManage && transaction.status === "PENDING_REVIEW",
       canConfirm:
         transaction.status === "PENDING_CONFIRMATION" &&
@@ -690,13 +684,23 @@ export async function getActivityAaEntryState(
   profileId: string | null | undefined,
 ) {
   if (!profileId) {
-    return { canAccess: false, actionCount: 0, unavailable: false };
+    return {
+      canAccess: false,
+      actionCount: 0,
+      summary: null,
+      unavailable: false,
+    };
   }
 
   try {
     const access = await getActivityAaAccess(activityId, profileId);
     if (!access) {
-      return { canAccess: false, actionCount: 0, unavailable: false };
+      return {
+        canAccess: false,
+        actionCount: 0,
+        summary: null,
+        unavailable: false,
+      };
     }
 
     const ledger = await prisma.aaLedger.findUnique({
@@ -705,18 +709,41 @@ export async function getActivityAaEntryState(
     });
 
     if (!ledger) {
-      return { canAccess: true, actionCount: 0, unavailable: false };
+      return {
+        canAccess: true,
+        actionCount: 0,
+        summary: null,
+        unavailable: false,
+      };
     }
 
     const snapshot = await getActivityAaSnapshot(activityId, profileId);
     return {
       canAccess: true,
       actionCount: Math.min(snapshot.summary.actionCount, 10),
+      summary: {
+        baseCurrency: snapshot.baseCurrency,
+        participantCount: snapshot.participants.filter(
+          (participant) => participant.status === "ACTIVE",
+        ).length,
+        pendingCount:
+          snapshot.summary.pendingReviewCount +
+          snapshot.summary.pendingChangeCount +
+          snapshot.summary.pendingConfirmationCount,
+        postedCount: snapshot.summary.postedCount,
+        totalExpenseMinor: snapshot.summary.expenseTotalMinor,
+        viewerBalanceMinor: snapshot.viewer.balanceMinor,
+      },
       unavailable: false,
     };
   } catch (error) {
     console.error("Failed to load AA entry state", error);
-    return { canAccess: true, actionCount: 0, unavailable: true };
+    return {
+      canAccess: true,
+      actionCount: 0,
+      summary: null,
+      unavailable: true,
+    };
   }
 }
 

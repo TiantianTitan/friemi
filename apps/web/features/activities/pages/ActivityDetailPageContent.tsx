@@ -88,6 +88,7 @@ import { DetailSourceRestore } from "@/features/navigation/components/DetailSour
 import { ActivityOrganizerContactForm } from "@/features/direct-messages/components/ActivityOrganizerContactForm";
 import { getActivityRoomUnreadState } from "@/features/activity-room-chat/services/activityRoomChat";
 import { ParticipantToolCard } from "@/features/aa/components/ParticipantToolCard";
+import { AaActivitySummaryCard } from "@/features/aa/components/AaActivitySummaryCard";
 import { getActivityAaEntryState } from "@/features/aa/server/ledgerService";
 import { getPublicEventCopy } from "@/features/public-events/copy";
 import { ensurePublicEventFromActivityInfo } from "@/features/public-events/queries/ensurePublicEventFromActivityInfo";
@@ -2051,6 +2052,15 @@ export async function ActivityDetailPageContent({
           ) : null}
           <ParticipantToolCard
             aaActionCount={activityAaEntryState.actionCount}
+            aaContent={
+              activityAaEntryState.canAccess ? (
+                <AaActivitySummaryCard
+                  href={withLocale(locale, `/lobby/${activity.id}/aa`)}
+                  locale={locale}
+                  summary={activityAaEntryState.summary}
+                />
+              ) : undefined
+            }
             aaHref={withLocale(locale, `/lobby/${activity.id}/aa`)}
             aaUnavailable={activityAaEntryState.unavailable}
             announcementContent={
@@ -2194,6 +2204,13 @@ export async function ActivityDetailPageContent({
             participantCount={activity.participantCount}
             participants={participantPreview}
           />
+          {activityAaEntryState.canAccess ? (
+            <AaActivitySummaryCard
+              href={withLocale(locale, `/lobby/${activity.id}/aa`)}
+              locale={locale}
+              summary={activityAaEntryState.summary}
+            />
+          ) : null}
           {showActivityAnnouncementPanel ? (
             <div className="scroll-mt-24" id="activity-announcement-desktop">
               <ActivityAnnouncementDetailPanel

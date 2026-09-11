@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { buildSettlementSuggestions, calculateBalances } from "../domain/ledger";
+import {
+  buildSettlementSuggestions,
+  calculateBalances,
+} from "../domain/ledger";
 import { getActivityAaAccess } from "../server/access";
 import { createAaNotifications } from "../server/notifications";
 import { getCurrentUserProfileForMutation } from "@/lib/auth";
@@ -58,11 +61,10 @@ export async function createAaPaymentRequestAction(formData: FormData) {
     }
     if (ledger.version !== input.ledgerVersion) throw new Error("STALE_LEDGER");
     if (
-      ledger.transactions.some(
-        (transaction) =>
-          ["PENDING_REVIEW", "PENDING_CONFIRMATION", "DISPUTED"].includes(
-            transaction.status,
-          ),
+      ledger.transactions.some((transaction) =>
+        ["PENDING_REVIEW", "PENDING_CONFIRMATION", "DISPUTED"].includes(
+          transaction.status,
+        ),
       )
     ) {
       throw new Error("SETTLEMENT_BLOCKED");
@@ -194,5 +196,5 @@ export async function cancelAaPaymentRequestAction(formData: FormData) {
     });
   });
 
-  redirect(withLocale(locale, `/lobby/${activityId}/aa?tab=settlement`));
+  redirect(withLocale(locale, `/lobby/${activityId}/aa/progress`));
 }
