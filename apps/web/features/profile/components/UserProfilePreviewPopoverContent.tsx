@@ -8,23 +8,13 @@ import { CharmGiftDialog } from "@/features/charm/components/CharmGiftDialog";
 import { FollowButton } from "@/features/follow/components/FollowButton";
 import { withLocale } from "@/lib/routes";
 import { CoCreatorIdentityBadge } from "./CoCreatorIdentityBadge";
-
-type UserPreviewPayload = {
-  avatarUrl: string | null;
-  bio: string | null;
-  id: string;
-  isCoCreator: boolean;
-  isSelf: boolean;
-  nickname: string;
-  relationship: {
-    friendshipId: string | null;
-    isFriend: boolean;
-    isFollowing: boolean;
-    isMutualFollow: boolean;
-    pendingFriendRequest: "received" | "sent" | null;
-    targetFollowsViewer: boolean;
-  };
-};
+import {
+  getCachedUserPreview,
+  setCachedUserPreview,
+  setCachedUserPreviewFollowState,
+  type UserPreviewPayload,
+  withUserPreviewFollowState,
+} from "../utils/userPreviewCache";
 
 type UserProfilePreviewPopoverContentProps = {
   avatarUrl: string | null;
@@ -53,8 +43,6 @@ const fallbackRelationship: UserPreviewPayload["relationship"] = {
   pendingFriendRequest: null,
   targetFollowsViewer: false,
 };
-const userPreviewCache = new Map<string, UserPreviewPayload | null>();
-
 function getInitial(name: string) {
   return name.trim().charAt(0).toUpperCase() || "N";
 }
@@ -105,6 +93,7 @@ function AddFriendQuickButton({
   isAuthenticated,
   locale,
   onFollowStateChange,
+  onOptimisticFollowStateChange,
   profileId,
   redirectPath,
   relationship,
@@ -112,6 +101,7 @@ function AddFriendQuickButton({
   isAuthenticated: boolean;
   locale: string;
   onFollowStateChange: (isFollowing: boolean) => void;
+  onOptimisticFollowStateChange: (isFollowing: boolean) => void;
   profileId: string;
   redirectPath: string;
   relationship: UserPreviewPayload["relationship"];
@@ -134,6 +124,7 @@ function AddFriendQuickButton({
       isAuthenticated={isAuthenticated}
       isFollowing={relationship.isFollowing}
       locale={locale}
+      onOptimisticStateChange={onOptimisticFollowStateChange}
       onStateChange={onFollowStateChange}
       redirectPath={redirectPath}
       targetUserProfileId={profileId}
@@ -184,18 +175,23 @@ export function UserProfilePreviewPopoverContent({
       return;
     }
 
-    const cachedPreview = userPreviewCache.get(profileId);
+    const cachedPreview = getCachedUserPreview(profileId);
 
     if (cachedPreview !== undefined) {
-      setData(cachedPreview);
+      setData(cachedPreview.payload);
       setIsLoading(false);
-      setErrorType(cachedPreview ? null : "not_found");
-      return;
+      setErrorType(cachedPreview.payload ? null : "not_found");
+
+      if (!cachedPreview.shouldRevalidate) {
+        return;
+      }
     }
 
     const controller = new AbortController();
-    setIsLoading(true);
-    setErrorType(null);
+    if (cachedPreview === undefined) {
+      setIsLoading(true);
+      setErrorType(null);
+    }
 
     fetch(`/api/user-preview/${encodeURIComponent(profileId)}`, {
       cache: "no-store",
@@ -211,8 +207,9 @@ export function UserProfilePreviewPopoverContent({
         }
 
         const payload = (await response.json()) as UserPreviewPayload;
-        userPreviewCache.set(profileId, payload);
+        setCachedUserPreview(profileId, payload);
         setData(payload);
+        setErrorType(null);
       })
       .catch((fetchError) => {
         if ((fetchError as Error).name === "AbortError") {
@@ -220,12 +217,15 @@ export function UserProfilePreviewPopoverContent({
         }
 
         if ((fetchError as Error).message === "NOT_FOUND") {
-          userPreviewCache.set(profileId, null);
+          setCachedUserPreview(profileId, null);
+          setData(null);
           setErrorType("not_found");
           return;
         }
 
-        setErrorType("load_failed");
+        if (cachedPreview === undefined) {
+          setErrorType("load_failed");
+        }
       })
       .finally(() => {
         setIsLoading(false);
@@ -234,25 +234,25 @@ export function UserProfilePreviewPopoverContent({
     return () => controller.abort();
   }, [isGuest, profileId]);
 
-  function handleFollowStateChange(isFollowing: boolean) {
+  function handleFollowStateChange(
+    isFollowing: boolean,
+    optimistic = false,
+  ) {
     setData((current) => {
       if (!current) {
         return current;
       }
 
-      const isMutualFollow =
-        isFollowing && current.relationship.targetFollowsViewer;
-      const nextPreview = {
-        ...current,
-        relationship: {
-          ...current.relationship,
-          isFriend: isMutualFollow,
-          isFollowing,
-          isMutualFollow,
-        },
-      };
+      const nextPreview = withUserPreviewFollowState(current, isFollowing);
+      const cachedNextPreview = setCachedUserPreviewFollowState(
+        profileId,
+        isFollowing,
+        { optimistic },
+      );
 
-      userPreviewCache.set(profileId, nextPreview);
+      if (!cachedNextPreview) {
+        setCachedUserPreview(profileId, nextPreview);
+      }
 
       return nextPreview;
     });
@@ -311,7 +311,12 @@ export function UserProfilePreviewPopoverContent({
               <AddFriendQuickButton
                 isAuthenticated={isAuthenticated}
                 locale={locale}
-                onFollowStateChange={handleFollowStateChange}
+                onFollowStateChange={(isFollowing) =>
+                  handleFollowStateChange(isFollowing)
+                }
+                onOptimisticFollowStateChange={(isFollowing) =>
+                  handleFollowStateChange(isFollowing, true)
+                }
                 profileId={profileId}
                 redirectPath={redirectPath}
                 relationship={relationship}
