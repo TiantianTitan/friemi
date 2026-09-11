@@ -31,6 +31,7 @@ type FollowButtonProps = {
   isAuthenticated: boolean;
   isFollowing: boolean;
   locale: string;
+  onOptimisticStateChange?: (isFollowing: boolean) => void;
   onStateChange?: (isFollowing: boolean) => void;
   redirectPath: string;
   targetUserProfileId: string;
@@ -100,6 +101,7 @@ export function FollowButton({
   isAuthenticated,
   isFollowing,
   locale,
+  onOptimisticStateChange,
   onStateChange,
   redirectPath,
   targetUserProfileId,
@@ -115,6 +117,9 @@ export function FollowButton({
   const formRef = useRef<HTMLFormElement | null>(null);
   const skipConfirmRef = useRef(false);
   const openingMutualConversationRef = useRef(false);
+  const onOptimisticStateChangeRef = useRef(onOptimisticStateChange);
+  const onStateChangeRef = useRef(onStateChange);
+  const previousFollowingRef = useRef<boolean | null>(null);
   const [optimisticIsFollowing, setOptimisticIsFollowing] =
     useState(isFollowing);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -122,6 +127,8 @@ export function FollowButton({
   const [mounted, setMounted] = useState(false);
   const [mutualPromptOpen, setMutualPromptOpen] = useState(false);
   const effectiveIsFollowing = state.isFollowing ?? optimisticIsFollowing;
+  onOptimisticStateChangeRef.current = onOptimisticStateChange;
+  onStateChangeRef.current = onStateChange;
 
   useEffect(() => {
     setOptimisticIsFollowing(isFollowing);
@@ -133,14 +140,19 @@ export function FollowButton({
 
   useEffect(() => {
     if (state.formError) {
-      setOptimisticIsFollowing(isFollowing);
+      const previousIsFollowing =
+        previousFollowingRef.current ?? isFollowing;
+      previousFollowingRef.current = null;
+      setOptimisticIsFollowing(previousIsFollowing);
+      onOptimisticStateChangeRef.current?.(previousIsFollowing);
       setIsSubmitting(false);
       openingMutualConversationRef.current = false;
       return;
     }
 
     if (typeof state.isFollowing === "boolean") {
-      onStateChange?.(state.isFollowing);
+      previousFollowingRef.current = null;
+      onStateChangeRef.current?.(state.isFollowing);
 
       if (state.becameMutualFollow && !openingMutualConversationRef.current) {
         openingMutualConversationRef.current = true;
@@ -188,7 +200,6 @@ export function FollowButton({
     }
   }, [
     isFollowing,
-    onStateChange,
     router,
     state.formError,
     state.isFollowing,
@@ -346,7 +357,10 @@ export function FollowButton({
           }
 
           skipConfirmRef.current = false;
-          setOptimisticIsFollowing((current) => !current);
+          const nextIsFollowing = !effectiveIsFollowing;
+          previousFollowingRef.current = effectiveIsFollowing;
+          setOptimisticIsFollowing(nextIsFollowing);
+          onOptimisticStateChangeRef.current?.(nextIsFollowing);
           setIsSubmitting(true);
         }}
       >

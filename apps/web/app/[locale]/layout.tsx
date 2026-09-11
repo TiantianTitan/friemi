@@ -115,7 +115,7 @@ export default async function LocaleLayout({
               <RouteProgress />
               <RouteTransitionMetrics locale={locale} />
               <AndroidAppBridge locale={locale} />
-              <IOSAppBridge />
+              {clerkEnabled ? <IOSAppBridge /> : null}
               <AppHeader
                 locale={locale}
                 isAuthenticated={Boolean(viewerProfile)}

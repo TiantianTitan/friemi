@@ -26,7 +26,7 @@ export function TopNewsHistoryBackButton({
   return (
     <button
       aria-label={label}
-      className="fixed left-[calc(var(--app-left-safe-area)+0.75rem)] top-[calc(var(--app-top-safe-area)+0.75rem)] z-[60] grid h-11 w-11 place-items-center rounded-full border border-white/35 bg-[#071F1C]/72 text-white shadow-[0_10px_30px_rgba(0,0,0,0.3)] backdrop-blur-md transition active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+      className="fixed left-[calc(var(--app-left-safe-area)+0.75rem)] top-[calc(var(--app-top-safe-area)+0.75rem)] z-[60] grid h-11 w-11 place-items-center rounded-full border border-white/35 bg-[#071F1C]/80 text-white shadow-[0_10px_30px_rgba(0,0,0,0.3)] backdrop-blur-md transition active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
       onClick={goBack}
       title={label}
       type="button"

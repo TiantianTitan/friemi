@@ -17,6 +17,7 @@ import {
   Trash2,
   UserMinus,
   UserPlus,
+  WalletCards,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -137,6 +138,83 @@ function getNotificationText(
   const t = getCopy(locale).notifications;
   const activityTitle = notification.activity?.title ?? t.fallbackActivity;
   const actorName = getNotificationActorName(notification, locale) ?? undefined;
+
+  if (notification.type.startsWith("AA_")) {
+    const by = actorName ?? (locale === "fr" ? "Un participant" : locale === "en" ? "A participant" : "有参与者");
+    const text =
+      locale === "fr"
+        ? {
+            AA_DISPUTE_OPENED: {
+              body: `${by} a signalé un désaccord dans « ${activityTitle} ».`,
+              title: "Désaccord de compte",
+            },
+            AA_ENTRY_UPDATED: {
+              body: `${by} a modifié une opération de « ${activityTitle} ».`,
+              title: "Compte AA mis à jour",
+            },
+            AA_PAYMENT_REQUEST: {
+              body: `${by} vous a envoyé une demande de paiement pour « ${activityTitle} ».`,
+              title: "Paiement demandé",
+            },
+            AA_REVIEW_REQUIRED: {
+              body: `${by} a soumis une opération à valider pour « ${activityTitle} ».`,
+              title: "Opération à valider",
+            },
+            AA_TRANSFER_CONFIRMATION: {
+              body: `${by} a enregistré un paiement à confirmer dans « ${activityTitle} ».`,
+              title: "Paiement à confirmer",
+            },
+          }
+        : locale === "en"
+          ? {
+              AA_DISPUTE_OPENED: {
+                body: `${by} opened a dispute in “${activityTitle}”.`,
+                title: "Ledger dispute",
+              },
+              AA_ENTRY_UPDATED: {
+                body: `${by} changed an entry in “${activityTitle}”.`,
+                title: "AA ledger updated",
+              },
+              AA_PAYMENT_REQUEST: {
+                body: `${by} sent you a payment request for “${activityTitle}”.`,
+                title: "Payment requested",
+              },
+              AA_REVIEW_REQUIRED: {
+                body: `${by} submitted an entry for review in “${activityTitle}”.`,
+                title: "Entry needs review",
+              },
+              AA_TRANSFER_CONFIRMATION: {
+                body: `${by} recorded a payment that needs confirmation in “${activityTitle}”.`,
+                title: "Confirm payment",
+              },
+            }
+          : {
+              AA_DISPUTE_OPENED: {
+                body: `${by}对「${activityTitle}」的一笔账发起了争议。`,
+                title: "核算争议待处理",
+              },
+              AA_ENTRY_UPDATED: {
+                body: `${by}更新了「${activityTitle}」的一笔核算记录。`,
+                title: "AA 记录有变更",
+              },
+              AA_PAYMENT_REQUEST: {
+                body: `${by}向你发送了「${activityTitle}」的付款请求。`,
+                title: "收到付款请求",
+              },
+              AA_REVIEW_REQUIRED: {
+                body: `${by}提交了「${activityTitle}」的一笔待审核记录。`,
+                title: "AA 记录待审核",
+              },
+              AA_TRANSFER_CONFIRMATION: {
+                body: `${by}登记了「${activityTitle}」的一笔待确认转账。`,
+                title: "转账待确认",
+              },
+            };
+    return text[notification.type as keyof typeof text] ?? {
+      body: activityTitle,
+      title: "AA",
+    };
+  }
 
   if (notification.type === "FRIEND_REQUEST") {
     const copy = t.types.FRIEND_REQUEST;
@@ -284,6 +362,13 @@ function getNotificationActionLabel(
   if (notification.type === "PLANET_JOIN_REQUEST") return t.openReview;
   if (notification.type === "PARTICIPATION_PENDING" && notification.actor) {
     return t.openReview;
+  }
+  if (notification.type.startsWith("AA_")) {
+    return locale === "fr"
+      ? "Ouvrir le compte"
+      : locale === "en"
+        ? "Open ledger"
+        : "进入核算";
   }
 
   return t.openActivity;
@@ -739,6 +824,23 @@ function getNotificationVisual(
   iconClassName: string;
   cardClassName: string;
 } {
+  if (type.startsWith("AA_")) {
+    const isWarning =
+      type === "AA_DISPUTE_OPENED" || type === "AA_REVIEW_REQUIRED";
+    return {
+      icon: isWarning ? AlertTriangle : WalletCards,
+      iconClassName: isUnread
+        ? isWarning
+          ? "bg-cream text-danger"
+          : "bg-meadow text-paper"
+        : "bg-fog text-outline",
+      cardClassName: isUnread
+        ? isWarning
+          ? "border-rose bg-paper"
+          : "border-sage bg-paper"
+        : "border-sand bg-paper/62",
+    };
+  }
   if (type === "PARTICIPATION_PENDING") {
     return {
       icon: Clock3,

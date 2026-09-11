@@ -279,6 +279,7 @@ export async function sendMobilePushForNotification(notificationId: string) {
       id: notificationId,
     },
     select: {
+      aaTransactionId: true,
       activity: {
         select: {
           coManagers: {
@@ -402,6 +403,7 @@ export async function sendMobilePushForNotification(notificationId: string) {
       type: notification.type,
     });
     const path = getNotificationPath({
+      aaTransactionId: notification.aaTransactionId,
       actorId: notification.actorId,
       activityId: notification.activityId,
       conversationId: directMessageConversationId,
